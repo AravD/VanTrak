@@ -1,0 +1,6 @@
+{
+  "name": "VanTrak",
+  "description": "A minimalist scheduling and driver management app for van fleets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

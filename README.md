@@ -1,0 +1,1 @@
+VanTrak is a full-stack logistics dashboard designed to streamline driver scheduling and delivery operations for small delivery companies currently relying on manual spreadsheet workflows.

@@ -81,101 +81,20 @@ export function MasterSchedule() {
     init();
   }, [currentDate]);
 
-  // Runs when drivers or weeklyScheduleId changes
-  // This automatically updates the DA Count row based on how many drivers work each day
-  useEffect(() => {
-    if (weeklyScheduleId) {
-      syncDaCounts();
-    }
-  }, [drivers, weeklyScheduleId]);
-
-  // Automatically calculates DA Count for each day and saves it to daily_requirements
-  const syncDaCounts = async () => {
-    if (!weeklyScheduleId) return;
-
-    // These match the boolean columns in the drivers table
-    const days: DayOfWeek[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-
-    // Build one database row for each day of the week
-    const upserts = days.map((dayKey, i) => {
-      const dateStr = format(addDays(weekStart, i), "yyyy-MM-dd");
-
-      // Count how many drivers have this day marked true
-      const count = drivers.filter((d) => d[dayKey]).length;
-
-      return {
-        weekly_schedule_id: weeklyScheduleId,
-        work_date: dateStr,
-        da_count: count,
-      };
-    });
-
-    // Insert or update the daily_requirements rows
-    const { error } = await supabase
-      .from("daily_requirements")
-      .upsert(upserts, { onConflict: "weekly_schedule_id,work_date" });
-
-    if (error) {
-      console.error("Error syncing DA counts:", error);
-    } else {
-      // Update local React state so the screen updates immediately
-      setRequirements((prev) => {
-        const updatedMapping = { ...prev };
-
-        upserts.forEach((u) => {
-          updatedMapping[u.work_date] = {
-            ...updatedMapping[u.work_date],
-            da_count: u.da_count,
-          };
-        });
-
-        return updatedMapping;
-      });
-    }
-  };
-
   // Finds or creates the weekly_schedules row for the currently displayed week
   const ensureWeeklySchedule = async () => {
-    const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    const { data, error } = await supabase.rpc("ensure_weekly_schedule", {
+      p_week_start: format(weekStart, "yyyy-MM-dd"),
+      p_week_end: format(addDays(weekStart, 6), "yyyy-MM-dd"),
+    });
 
-    // Check if a weekly schedule already exists for this week
-    const { data: existing, error: fetchError } = await supabase
-      .from("weekly_schedules")
-      .select("id")
-      .eq("week_start_date", weekStartStr)
-      .maybeSingle();
-
-    if (fetchError && fetchError.code !== "PGRST116") {
-      console.error("Error checking weekly schedule:", fetchError);
+    if (error) {
+      console.error("Error ensuring weekly schedule:", error);
+      return null;
     }
 
-    // If it already exists, store and return the schedule id
-    if (existing) {
-      setWeeklyScheduleId(existing.id);
-      return existing.id;
-    }
-
-    // If it does not exist, create a new weekly schedule row
-    const weekEndDateStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-
-    const { data: created, error } = await supabase
-      .from("weekly_schedules")
-      .insert({
-        week_start_date: weekStartStr,
-        week_end_date: weekEndDateStr,
-      })
-      .select("id")
-      .single();
-
-    // Save the newly created schedule id
-    if (created) {
-      setWeeklyScheduleId(created.id);
-      return created.id;
-    }
-
-    if (error) console.error("Error ensuring weekly schedule:", error);
-
-    return null;
+    setWeeklyScheduleId(data);
+    return data as string;
   };
 
   // Loads all drivers from Supabase and sorts them by last name
@@ -241,12 +160,8 @@ export function MasterSchedule() {
     string | null
   >(null);
 
-  // Deletes a station and also deletes all station_values rows connected to it
+  // Deletes a station — station_values are cleaned up automatically via ON DELETE CASCADE
   const handleDeleteStation = async (stationId: string) => {
-    // First delete related station values so there are no orphaned values
-    await supabase.from("station_values").delete().eq("station_id", stationId);
-
-    // Then delete the actual station row
     const { error } = await supabase
       .from("stations")
       .delete()

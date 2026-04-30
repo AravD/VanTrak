@@ -1,6 +1,7 @@
 import React, { useState, useEffect, ChangeEvent } from "react";
 import { supabase } from "../../lib/supabase";
-import { Driver } from "../../types/driver";
+import { Driver, DayOfWeek } from "../../types/driver";
+import { format, startOfWeek, addDays } from "date-fns";
 import { Edit2, Plus, Trash2, Mail, Phone, Check, X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
@@ -22,6 +23,31 @@ export function DriverContacts() {
 
     if (error) console.error("Error fetching drivers:", error);
     else setDrivers(data || []);
+  };
+
+  const syncDaCountsForAllWeeks = async (currentDrivers: Driver[]) => {
+    const { data: schedules, error } = await supabase
+      .from("weekly_schedules")
+      .select("id, week_start_date");
+
+    if (error || !schedules) return;
+
+    const days: DayOfWeek[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+    const upserts = schedules.flatMap((schedule) => {
+      const weekStart = startOfWeek(new Date(schedule.week_start_date + "T12:00:00"));
+      return days.map((dayKey, i) => ({
+        weekly_schedule_id: schedule.id,
+        work_date: format(addDays(weekStart, i), "yyyy-MM-dd"),
+        da_count: currentDrivers.filter((d) => d[dayKey]).length,
+      }));
+    });
+
+    if (upserts.length > 0) {
+      await supabase
+        .from("daily_requirements")
+        .upsert(upserts, { onConflict: "weekly_schedule_id,work_date" });
+    }
   };
 
   const handleDeleteDriver = async (driverId: string) => {
@@ -51,9 +77,11 @@ export function DriverContacts() {
 
       if (data && data.length > 0) {
         console.log("Driver successfully removed from database.");
-        // Refresh local state immediately
-        setDrivers((prev) => prev.filter((d) => d.id !== driverId));
+        const updatedDrivers = drivers.filter((d) => d.id !== driverId);
+        setDrivers(updatedDrivers);
         setIsModalOpen(false);
+        // Sync DA counts across all weeks since MasterSchedule may not be mounted
+        await syncDaCountsForAllWeeks(updatedDrivers);
       } else {
         console.warn(
           "No rows were deleted. This could mean the ID wasn't found or RLS policies are blocking the deletion.",

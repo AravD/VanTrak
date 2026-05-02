@@ -1,7 +1,7 @@
-import React, { useState, useEffect, ChangeEvent } from "react";
+import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import { supabase } from "../../lib/supabase";
 import { Driver } from "../../types/driver";
-import { Edit2, Plus, Trash2, Mail, Phone, Check, X } from "lucide-react";
+import { Edit2, Plus, Trash2, Mail, Phone, Check, X, Search } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -9,10 +9,42 @@ export function DriverContacts() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  const suggestions = searchQuery.trim()
+    ? drivers
+        .filter((d) => {
+          const q = searchQuery.toLowerCase();
+          return (
+            `${d.first_name} ${d.last_name}`.toLowerCase().includes(q) ||
+            `${d.last_name} ${d.first_name}`.toLowerCase().includes(q)
+          );
+        })
+        .slice(0, 8)
+    : [];
 
   useEffect(() => {
     fetchDrivers();
   }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSelectDriver = (driver: Driver) => {
+    setEditingDriver(driver);
+    setIsModalOpen(true);
+    setSearchQuery("");
+    setShowDropdown(false);
+  };
 
   const fetchDrivers = async () => {
     const { data, error } = await supabase
@@ -74,8 +106,8 @@ export function DriverContacts() {
   };
 
   return (
-    <div className="p-8 max-w-[1400px]">
-      <header className="flex justify-between items-center mb-10">
+    <div className="p-8 max-w-[1400px] mx-auto">
+      <header className="flex justify-between items-center mb-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-black">
             Driver Contacts
@@ -93,6 +125,62 @@ export function DriverContacts() {
           Add New Driver
         </button>
       </header>
+
+      <div className="relative w-64 mb-6" ref={searchRef}>
+        <Search
+          size={13}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+        />
+        <input
+          type="text"
+          placeholder="Search Drivers"
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setShowDropdown(true);
+          }}
+          onFocus={() => setShowDropdown(true)}
+          className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-gray-300 text-xs placeholder:text-gray-400 transition-all"
+        />
+        <AnimatePresence>
+          {showDropdown && suggestions.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.13 }}
+              className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-gray-100 rounded-2xl shadow-xl shadow-gray-100/60 overflow-hidden z-40"
+            >
+              {suggestions.map((driver) => (
+                <button
+                  key={driver.id}
+                  onMouseDown={() => handleSelectDriver(driver)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-0"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-black text-sm">
+                      {driver.first_name} {driver.last_name}
+                    </div>
+                    {driver.phone && (
+                      <div className="text-xs text-gray-400 mt-0.5 font-medium">
+                        {driver.phone}
+                      </div>
+                    )}
+                  </div>
+                  <span
+                    className={cn(
+                      "px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-tighter shrink-0",
+                      statusColors[driver.status as keyof typeof statusColors],
+                    )}
+                  >
+                    {driver.status}
+                  </span>
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
         <table className="w-full text-left border-collapse">

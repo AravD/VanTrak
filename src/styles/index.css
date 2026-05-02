@@ -9,3 +9,51 @@
 body {
   @apply bg-[#FAFAFA] text-gray-900 antialiased;
 }
+
+/* react-datepicker overrides */
+.rdp-custom .react-datepicker {
+  @apply font-sans border border-gray-100 rounded-2xl shadow-xl shadow-gray-100/60 bg-white overflow-hidden p-3;
+}
+.rdp-custom .react-datepicker__triangle {
+  display: none;
+}
+.rdp-custom .react-datepicker__header {
+  @apply bg-white border-none pb-1 pt-0;
+}
+.rdp-custom .react-datepicker__current-month {
+  @apply text-sm font-bold text-black tracking-tight mb-2;
+}
+.rdp-custom .react-datepicker__navigation {
+  @apply top-3;
+}
+.rdp-custom .react-datepicker__navigation-icon::before {
+  @apply border-gray-400;
+}
+.rdp-custom .react-datepicker__day-names {
+  @apply mb-0;
+}
+.rdp-custom .react-datepicker__day-name {
+  @apply text-[10px] font-bold uppercase tracking-widest text-gray-400 w-8 leading-8;
+}
+.rdp-custom .react-datepicker__day {
+  @apply w-8 h-8 leading-8 text-xs font-medium text-gray-700 rounded-xl hover:bg-gray-100 hover:text-black transition-colors;
+}
+.rdp-custom .react-datepicker__day--selected,
+.rdp-custom .react-datepicker__day--keyboard-selected {
+  @apply bg-black text-white rounded-xl hover:bg-gray-800;
+}
+.rdp-custom .react-datepicker__day--today {
+  @apply font-bold text-black;
+}
+.rdp-custom .react-datepicker__day--outside-month {
+  @apply text-gray-300;
+}
+.rdp-custom .react-datepicker__day--disabled {
+  @apply text-gray-200 cursor-not-allowed hover:bg-transparent;
+}
+.rdp-custom .react-datepicker__month {
+  @apply m-0;
+}
+.rdp-custom .react-datepicker-popper {
+  @apply z-50;
+}

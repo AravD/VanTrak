@@ -1,10 +1,10 @@
 import React from "react";
-import { Calendar, Users } from "lucide-react";
+import { Calendar, Users, CalendarOff } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 interface SidebarProps {
-  activePage: "schedule" | "contacts";
-  onPageChange: (page: "schedule" | "contacts") => void;
+  activePage: "schedule" | "contacts" | "timeoff";
+  onPageChange: (page: "schedule" | "contacts" | "timeoff") => void;
 }
 
 export function Sidebar({ activePage, onPageChange }: SidebarProps) {
@@ -43,6 +43,22 @@ export function Sidebar({ activePage, onPageChange }: SidebarProps) {
         >
           <Users size={20} />
           {activePage === "contacts" && (
+            <div className="absolute right-[-12px] top-1/2 -translate-y-1/2 w-1 h-4 bg-black rounded-full" />
+          )}
+        </button>
+
+        <button
+          onClick={() => onPageChange("timeoff")}
+          className={cn(
+            "p-3 rounded-xl transition-all duration-200 group relative",
+            activePage === "timeoff"
+              ? "bg-black text-white shadow-lg"
+              : "text-gray-400 hover:text-black hover:bg-gray-50",
+          )}
+          title="Time Off & Exceptions"
+        >
+          <CalendarOff size={20} />
+          {activePage === "timeoff" && (
             <div className="absolute right-[-12px] top-1/2 -translate-y-1/2 w-1 h-4 bg-black rounded-full" />
           )}
         </button>

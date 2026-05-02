@@ -2,14 +2,17 @@ import React, { useState } from 'react';
 import { Sidebar } from '../components/layout/Sidebar';
 import { MasterSchedule } from '../components/schedule/MasterSchedule';
 import { DriverContacts } from '../components/drivers/DriverContacts';
+import { TimeOffExceptions } from '../components/timeoff/TimeOffExceptions';
 import { motion, AnimatePresence } from 'motion/react';
 
+type Page = 'schedule' | 'contacts' | 'timeoff';
+
 export default function App() {
-  const [activePage, setActivePage] = useState<'schedule' | 'contacts'>(
-    () => (localStorage.getItem('activePage') as 'schedule' | 'contacts') || 'schedule'
+  const [activePage, setActivePage] = useState<Page>(
+    () => (localStorage.getItem('activePage') as Page) || 'schedule'
   );
 
-  const handlePageChange = (page: 'schedule' | 'contacts') => {
+  const handlePageChange = (page: Page) => {
     localStorage.setItem('activePage', page);
     setActivePage(page);
   };
@@ -29,8 +32,10 @@ export default function App() {
           >
             {activePage === 'schedule' ? (
               <MasterSchedule />
-            ) : (
+            ) : activePage === 'contacts' ? (
               <DriverContacts />
+            ) : (
+              <TimeOffExceptions />
             )}
           </motion.div>
         </AnimatePresence>

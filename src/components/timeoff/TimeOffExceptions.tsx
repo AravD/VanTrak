@@ -27,20 +27,14 @@ interface Exception {
   end_date: string;
   remove_from_schedule: boolean;
   makeup_required: boolean;
-  makeup_date: string | null;
+  makeup_start_date: string | null;
+  makeup_end_date: string | null;
   notes: string | null;
-  status: "Active" | "Resolved" | "Cancelled";
   created_at: string;
   drivers?: { first_name: string; last_name: string };
 }
 
 const EXCEPTION_TYPES = ["Time Off", "Sick", "Other"];
-
-const statusColors = {
-  Active: "bg-green-100 text-green-700 border-green-200",
-  Resolved: "bg-blue-100 text-blue-700 border-blue-200",
-  Cancelled: "bg-gray-100 text-gray-500 border-gray-200",
-};
 
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return "—";
@@ -63,7 +57,7 @@ export function TimeOffExceptions() {
     const { data, error } = await supabase
       .from("schedule_exceptions")
       .select("*, drivers(first_name, last_name)")
-      .order("start_date", { ascending: false });
+      .order("created_at", { ascending: false });
 
     if (error) console.error("Error fetching exceptions:", error);
     else setExceptions((data as Exception[]) || []);
@@ -121,7 +115,6 @@ export function TimeOffExceptions() {
                 <th className="px-6 py-4">Dates</th>
                 <th className="px-6 py-4">Makeup</th>
                 <th className="px-6 py-4">Notes</th>
-                <th className="px-6 py-4 text-right">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -171,9 +164,13 @@ export function TimeOffExceptions() {
                       >
                         {exc.makeup_required ? "Required" : "None"}
                       </span>
-                      {exc.makeup_required && exc.makeup_date && (
+                      {exc.makeup_required && exc.makeup_start_date && (
                         <span className="text-[10px] text-gray-400 font-medium">
-                          {formatDate(exc.makeup_date)}
+                          {formatDate(exc.makeup_start_date)}
+                          {exc.makeup_end_date &&
+                            exc.makeup_end_date !== exc.makeup_start_date && (
+                              <> — {formatDate(exc.makeup_end_date)}</>
+                            )}
                         </span>
                       )}
                     </div>
@@ -185,16 +182,6 @@ export function TimeOffExceptions() {
                     >
                       {exc.notes || "—"}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span
-                      className={cn(
-                        "px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-tighter",
-                        statusColors[exc.status as keyof typeof statusColors],
-                      )}
-                    >
-                      {exc.status}
-                    </span>
                   </td>
                 </tr>
               ))}
@@ -383,10 +370,17 @@ function ExceptionModal({
       end_date: "",
       remove_from_schedule: true,
       makeup_required: false,
-      makeup_date: null,
+      makeup_start_date: null,
+      makeup_end_date: null,
       notes: "",
-      status: "Active",
     },
+  );
+
+  const [makeupStart, setMakeupStart] = useState(
+    exception?.makeup_start_date ?? "",
+  );
+  const [makeupEnd, setMakeupEnd] = useState(
+    exception?.makeup_end_date ?? "",
   );
 
   useEffect(() => {
@@ -417,16 +411,21 @@ function ExceptionModal({
       });
       return;
     }
-    if (
-      formData.makeup_required &&
-      formData.makeup_date &&
-      formData.makeup_date <= formData.end_date
-    ) {
-      setStatusMessage({
-        type: "error",
-        text: "Makeup date must be after the end date.",
-      });
-      return;
+    if (formData.makeup_required) {
+      if (!makeupStart || !makeupEnd) {
+        setStatusMessage({
+          type: "error",
+          text: "Makeup start and end dates are required.",
+        });
+        return;
+      }
+      if (makeupEnd < makeupStart) {
+        setStatusMessage({
+          type: "error",
+          text: "Makeup end date must be on or after makeup start date.",
+        });
+        return;
+      }
     }
 
     setStatusMessage(null);
@@ -439,11 +438,9 @@ function ExceptionModal({
       end_date: formData.end_date,
       remove_from_schedule: formData.remove_from_schedule ?? true,
       makeup_required: formData.makeup_required ?? false,
-      makeup_date: formData.makeup_required
-        ? formData.makeup_date || null
-        : null,
+      makeup_start_date: formData.makeup_required ? makeupStart || null : null,
+      makeup_end_date: formData.makeup_required ? makeupEnd || null : null,
       notes: formData.notes || null,
-      status: formData.status,
     };
 
     try {
@@ -608,31 +605,10 @@ function ExceptionModal({
             />
           </div>
 
-          {/* Status */}
+          {/* Remove Assigned Shifts */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-              Status
-            </label>
-            <select
-              value={formData.status}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  status: e.target.value as Exception["status"],
-                })
-              }
-              className={field}
-            >
-              <option>Active</option>
-              <option>Resolved</option>
-              <option>Cancelled</option>
-            </select>
-          </div>
-
-          {/* Remove from Schedule */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-              Remove from Schedule
+              Remove Assigned Shifts
             </label>
             <button
               type="button"
@@ -655,47 +631,68 @@ function ExceptionModal({
             </label>
             <button
               type="button"
-              onClick={() =>
-                setFormData({
-                  ...formData,
-                  makeup_required: !formData.makeup_required,
-                  makeup_date: !formData.makeup_required
-                    ? formData.makeup_date
-                    : null,
-                })
-              }
+              onClick={() => {
+                const next = !formData.makeup_required;
+                setFormData({ ...formData, makeup_required: next });
+                if (!next) {
+                  setMakeupStart("");
+                  setMakeupEnd("");
+                }
+              }}
               className={toggle(formData.makeup_required ?? false)}
             >
               {formData.makeup_required ? "Yes" : "No"}
             </button>
           </div>
 
-          {/* Makeup Date — only shown when makeup is required */}
-          <div className="space-y-1.5">
-            <label
-              className={cn(
-                "text-[10px] font-bold uppercase tracking-widest",
-                formData.makeup_required ? "text-gray-400" : "text-gray-200",
-              )}
-            >
-              Makeup Date
-            </label>
-            <ReactDatePicker
-              selected={toDate(formData.makeup_date)}
-              onChange={(date: Date | null) =>
-                setFormData({ ...formData, makeup_date: toStr(date) || null })
-              }
-              disabled={!formData.makeup_required}
-              dateFormat="MM/dd/yyyy"
-              placeholderText="MM/DD/YYYY"
-              className={cn(
-                field,
-                !formData.makeup_required && "opacity-30 cursor-not-allowed",
-              )}
-              wrapperClassName="w-full"
-              popperClassName="rdp-custom"
-            />
-          </div>
+          {/* Makeup Date Range — animates in when makeup is required */}
+          <AnimatePresence>
+            {formData.makeup_required && (
+              <motion.div
+                key="makeup-range"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                className="col-span-2 overflow-hidden"
+              >
+                <div className="grid grid-cols-2 gap-4 pt-1">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                      Makeup Start Date
+                    </label>
+                    <ReactDatePicker
+                      selected={toDate(makeupStart)}
+                      onChange={(date: Date | null) =>
+                        setMakeupStart(toStr(date))
+                      }
+                      dateFormat="MM/dd/yyyy"
+                      placeholderText="MM/DD/YYYY"
+                      className={field}
+                      wrapperClassName="w-full"
+                      popperClassName="rdp-custom"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                      Makeup End Date
+                    </label>
+                    <ReactDatePicker
+                      selected={toDate(makeupEnd)}
+                      onChange={(date: Date | null) =>
+                        setMakeupEnd(toStr(date))
+                      }
+                      dateFormat="MM/dd/yyyy"
+                      placeholderText="MM/DD/YYYY"
+                      className={field}
+                      wrapperClassName="w-full"
+                      popperClassName="rdp-custom"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Notes */}
           <div className="space-y-1.5 col-span-2">

@@ -30,6 +30,7 @@ interface Exception {
   makeup_start_date: string | null;
   makeup_end_date: string | null;
   notes: string | null;
+  status: "Pending" | "Applied";
   created_at: string;
   drivers?: { first_name: string; last_name: string };
 }
@@ -53,6 +54,13 @@ export function TimeOffExceptions() {
     fetchExceptions();
   }, []);
 
+  const sortExceptions = (list: Exception[]) =>
+    [...list].sort((a, b) => {
+      if (a.status === "Pending" && b.status !== "Pending") return -1;
+      if (a.status !== "Pending" && b.status === "Pending") return 1;
+      return 0;
+    });
+
   const fetchExceptions = async () => {
     const { data, error } = await supabase
       .from("schedule_exceptions")
@@ -60,7 +68,23 @@ export function TimeOffExceptions() {
       .order("created_at", { ascending: false });
 
     if (error) console.error("Error fetching exceptions:", error);
-    else setExceptions((data as Exception[]) || []);
+    else setExceptions(sortExceptions((data as Exception[]) || []));
+  };
+
+  const handleStatusChange = async (id: string, newStatus: "Pending" | "Applied") => {
+    const { error } = await supabase
+      .from("schedule_exceptions")
+      .update({ status: newStatus })
+      .eq("id", id);
+
+    if (error) {
+      alert(`Error updating status: ${error.message}`);
+      return;
+    }
+
+    setExceptions((prev) =>
+      sortExceptions(prev.map((e) => (e.id === id ? { ...e, status: newStatus } : e))),
+    );
   };
 
   const handleDelete = async (id: string) => {
@@ -115,6 +139,7 @@ export function TimeOffExceptions() {
                 <th className="px-6 py-4">Dates</th>
                 <th className="px-6 py-4">Makeup</th>
                 <th className="px-6 py-4">Notes</th>
+                <th className="px-6 py-4">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -153,7 +178,7 @@ export function TimeOffExceptions() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 items-start">
                       <span
                         className={cn(
                           "px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-tighter w-fit",
@@ -182,6 +207,27 @@ export function TimeOffExceptions() {
                     >
                       {exc.notes || "—"}
                     </div>
+                  </td>
+                  <td
+                    className="px-6 py-4"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() =>
+                        handleStatusChange(
+                          exc.id,
+                          exc.status === "Pending" ? "Applied" : "Pending",
+                        )
+                      }
+                      className={cn(
+                        "px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-tighter transition-colors cursor-pointer",
+                        exc.status === "Pending"
+                          ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                          : "bg-green-50 text-green-700 border-green-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200",
+                      )}
+                    >
+                      {exc.status}
+                    </button>
                   </td>
                 </tr>
               ))}

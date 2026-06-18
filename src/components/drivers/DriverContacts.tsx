@@ -4,6 +4,9 @@ import { Driver } from "../../types/driver";
 import { Edit2, Plus, Trash2, Mail, Phone, Check, X, Search } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
+import { PageHeader } from "../common/PageHeader";
+
+const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 export function DriverContacts() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -11,6 +14,7 @@ export function DriverContacts() {
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [overscheduledIds, setOverscheduledIds] = useState<Set<string>>(new Set());
   const searchRef = useRef<HTMLDivElement>(null);
 
   const suggestions = searchQuery.trim()
@@ -27,7 +31,40 @@ export function DriverContacts() {
 
   useEffect(() => {
     fetchDrivers();
+    fetchOverscheduled();
   }, []);
+
+  // Keep the over-scheduled highlight live: refetch whenever assignments change
+  // (time off, makeup days, station moves all write to schedule_assignments).
+  useEffect(() => {
+    const channel = supabase
+      .channel("contacts-overschedule")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "schedule_assignments" },
+        () => fetchOverscheduled(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Drivers assigned > 5 days in any week (from the driver_overscheduled DB view)
+  const fetchOverscheduled = async () => {
+    const { data, error } = await supabase
+      .from("driver_overscheduled")
+      .select("driver_id, is_overscheduled");
+    if (!error && data) {
+      setOverscheduledIds(
+        new Set(
+          (data as { driver_id: string; is_overscheduled: boolean }[])
+            .filter((d) => d.is_overscheduled)
+            .map((d) => d.driver_id),
+        ),
+      );
+    }
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -106,14 +143,8 @@ export function DriverContacts() {
   };
 
   return (
-    <div className="p-8 max-w-[1400px] mx-auto">
-      <header className="flex justify-between items-center mb-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-black">
-            Driver Contacts
-          </h1>
-        </div>
-
+    <div className="p-8 max-w-[1600px] mx-auto">
+      <PageHeader title="Driver Contacts">
         <button
           onClick={() => {
             setEditingDriver(null);
@@ -124,7 +155,7 @@ export function DriverContacts() {
           <Plus size={20} />
           Add New Driver
         </button>
-      </header>
+      </PageHeader>
 
       <div className="relative w-64 mb-6" ref={searchRef}>
         <Search
@@ -210,8 +241,21 @@ export function DriverContacts() {
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="font-bold text-black">
-                    {driver.first_name} {driver.last_name}
+                  <div className="font-bold">
+                    <span
+                      className={cn(
+                        overscheduledIds.has(driver.id)
+                          ? "bg-red-100 text-red-700 px-1.5 py-0.5 rounded"
+                          : "text-black",
+                      )}
+                      title={
+                        overscheduledIds.has(driver.id)
+                          ? "Driver scheduled for more than 5 days"
+                          : undefined
+                      }
+                    >
+                      {driver.first_name} {driver.last_name}
+                    </span>
                   </div>
                 </td>
                 <td className="px-6 py-4">

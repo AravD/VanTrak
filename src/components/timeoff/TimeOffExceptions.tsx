@@ -17,6 +17,7 @@ import { Driver } from "../../types/driver";
 import { Plus, Trash2 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
+import { PageHeader } from "../common/PageHeader";
 
 interface Exception {
   id: string;
@@ -108,14 +109,8 @@ export function TimeOffExceptions() {
   };
 
   return (
-    <div className="p-8 max-w-[1400px] mx-auto">
-      <header className="flex justify-between items-center mb-10">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-black">
-            Time Off Requests
-          </h1>
-        </div>
-
+    <div className="p-8 max-w-[1600px] mx-auto">
+      <PageHeader title="Time Off Requests">
         <button
           onClick={() => {
             setEditingException(null);
@@ -126,7 +121,7 @@ export function TimeOffExceptions() {
           <Plus size={20} />
           Add Exception
         </button>
-      </header>
+      </PageHeader>
 
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-y-auto max-h-[420px]">

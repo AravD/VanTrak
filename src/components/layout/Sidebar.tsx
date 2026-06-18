@@ -1,18 +1,27 @@
 import React from "react";
-import { Calendar, Users, CalendarOff } from "lucide-react";
+import { Calendar, Users, CalendarOff, ClipboardList, Download } from "lucide-react";
 import { cn } from "../../lib/utils";
 
+type Page = "schedule" | "contacts" | "timeoff" | "dailyreport" | "saveinfo";
+
 interface SidebarProps {
-  activePage: "schedule" | "contacts" | "timeoff";
-  onPageChange: (page: "schedule" | "contacts" | "timeoff") => void;
+  activePage: Page;
+  onPageChange: (page: Page) => void;
+  /** Returns to the auth/landing page. */
+  onLogoClick: () => void;
 }
 
-export function Sidebar({ activePage, onPageChange }: SidebarProps) {
+export function Sidebar({ activePage, onPageChange, onLogoClick }: SidebarProps) {
   return (
-    <div className="w-16 h-screen border-r border-gray-100 bg-white flex flex-col items-center py-6 gap-8 fixed left-0 top-0">
-      <div className="text-black font-bold text-xl tracking-tighter mb-4">
+    <div className="w-16 h-screen border-r border-gray-100 bg-white flex flex-col items-center pt-8 pb-6 gap-8 fixed left-0 top-0">
+      <button
+        onClick={onLogoClick}
+        title="Landing page"
+        aria-label="Go to landing page"
+        className="text-black font-bold text-3xl tracking-tighter mt-1.5 mb-6 transition-transform duration-150 ease-out hover:scale-105 active:scale-95 cursor-pointer"
+      >
         VT
-      </div>
+      </button>
 
       <nav className="flex flex-col gap-4">
         <button
@@ -27,6 +36,38 @@ export function Sidebar({ activePage, onPageChange }: SidebarProps) {
         >
           <Calendar size={20} />
           {activePage === "schedule" && (
+            <div className="absolute right-[-12px] top-1/2 -translate-y-1/2 w-1 h-4 bg-black rounded-full" />
+          )}
+        </button>
+
+        <button
+          onClick={() => onPageChange("dailyreport")}
+          className={cn(
+            "p-3 rounded-xl transition-all duration-200 group relative",
+            activePage === "dailyreport"
+              ? "bg-black text-white shadow-lg"
+              : "text-gray-400 hover:text-black hover:bg-gray-50",
+          )}
+          title="Daily Report"
+        >
+          <ClipboardList size={20} />
+          {activePage === "dailyreport" && (
+            <div className="absolute right-[-12px] top-1/2 -translate-y-1/2 w-1 h-4 bg-black rounded-full" />
+          )}
+        </button>
+
+        <button
+          onClick={() => onPageChange("timeoff")}
+          className={cn(
+            "p-3 rounded-xl transition-all duration-200 group relative",
+            activePage === "timeoff"
+              ? "bg-black text-white shadow-lg"
+              : "text-gray-400 hover:text-black hover:bg-gray-50",
+          )}
+          title="Time Off & Exceptions"
+        >
+          <CalendarOff size={20} />
+          {activePage === "timeoff" && (
             <div className="absolute right-[-12px] top-1/2 -translate-y-1/2 w-1 h-4 bg-black rounded-full" />
           )}
         </button>
@@ -48,17 +89,17 @@ export function Sidebar({ activePage, onPageChange }: SidebarProps) {
         </button>
 
         <button
-          onClick={() => onPageChange("timeoff")}
+          onClick={() => onPageChange("saveinfo")}
           className={cn(
             "p-3 rounded-xl transition-all duration-200 group relative",
-            activePage === "timeoff"
+            activePage === "saveinfo"
               ? "bg-black text-white shadow-lg"
               : "text-gray-400 hover:text-black hover:bg-gray-50",
           )}
-          title="Time Off & Exceptions"
+          title="Save Information"
         >
-          <CalendarOff size={20} />
-          {activePage === "timeoff" && (
+          <Download size={20} />
+          {activePage === "saveinfo" && (
             <div className="absolute right-[-12px] top-1/2 -translate-y-1/2 w-1 h-4 bg-black rounded-full" />
           )}
         </button>

@@ -9,6 +9,7 @@ interface ScheduledDriver {
   driver_id: string;
   first_name: string;
   last_name: string;
+  notes: string | null;
 }
 
 interface WeekAssignment {
@@ -188,7 +189,7 @@ export function MasterSchedule() {
   const fetchAssignments = async (scheduleId: string) => {
     const { data, error } = await supabase
       .from("schedule_assignments")
-      .select("driver_id, work_date, station_id, drivers(first_name, last_name)")
+      .select("driver_id, work_date, station_id, drivers(first_name, last_name, notes)")
       .eq("weekly_schedule_id", scheduleId)
       .eq("assignment_status", "Scheduled");
     if (error) {
@@ -395,6 +396,17 @@ export function MasterSchedule() {
     return flagged;
   })();
 
+  // Drivers flagged "New Hire" in their notes — shown with a pink dot.
+  const newHireDriverIds = (() => {
+    const flagged = new Set<string>();
+    weekAssignments.forEach((a) => {
+      if (a.drivers?.notes && a.drivers.notes.toLowerCase().includes("new hire")) {
+        flagged.add(a.driver_id);
+      }
+    });
+    return flagged;
+  })();
+
   // Assignments with null station_id belong to the default station (legacy data)
   const getDriversForStation = (stationId: string, dayIndex: number): ScheduledDriver[] => {
     const dateStr = format(weekDays[dayIndex], "yyyy-MM-dd");
@@ -407,6 +419,7 @@ export function MasterSchedule() {
         driver_id: a.driver_id,
         first_name: a.drivers!.first_name,
         last_name: a.drivers!.last_name,
+        notes: a.drivers!.notes,
       }))
       .sort((a, b) => a.first_name.localeCompare(b.first_name));
   };
@@ -712,6 +725,12 @@ export function MasterSchedule() {
                       >
                         {driver ? (
                           <span className="inline-flex items-center justify-center gap-1 w-full overflow-hidden">
+                            {newHireDriverIds.has(driver.driver_id) && (
+                              <span
+                                title="New hire"
+                                className="w-1.5 h-1.5 rounded-full bg-pink-500 shrink-0"
+                              />
+                            )}
                             {overscheduledDriverIds.has(driver.driver_id) && (
                               <span
                                 title="Driver scheduled for more than 5 days"

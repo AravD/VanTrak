@@ -4,6 +4,7 @@ import { Plus, X, Trash2, AlertCircle, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { DailyIssue, ISSUE_TYPES, RollCallDriver } from '../../types/driver';
+import { useAuth } from '../../app/auth-context';
 
 function issueTypeColor(type: string) {
   switch (type) {
@@ -131,6 +132,8 @@ function FormFields({
 }
 
 export function IssuesTab({ selectedDate, activeStationId, drivers, issues, onChanged }: IssuesTabProps) {
+  const { hasPermission } = useAuth();
+  const canLog = hasPermission('reports.issues.log');
   // Log modal
   const [showLog, setShowLog] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm(selectedDate));
@@ -252,13 +255,15 @@ export function IssuesTab({ selectedDate, activeStationId, drivers, issues, onCh
           </span>
         </div>
 
-        <button
-          onClick={openLog}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black text-white text-sm font-bold hover:bg-gray-800 transition-all shadow-lg shadow-gray-200 active:scale-[0.97]"
-        >
-          <Plus size={15} />
-          Log Issue
-        </button>
+        {canLog && (
+          <button
+            onClick={openLog}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black text-white text-sm font-bold hover:bg-gray-800 transition-all shadow-lg shadow-gray-200 active:scale-[0.97]"
+          >
+            <Plus size={15} />
+            Log Issue
+          </button>
+        )}
       </div>
 
       {/* Daily issue list */}

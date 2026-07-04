@@ -5,6 +5,7 @@ import { Edit2, Plus, Trash2, Mail, Phone, Check, X, Search } from "lucide-react
 import { cn } from "../../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { PageHeader } from "../common/PageHeader";
+import { useAuth } from "../../app/auth-context";
 
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
@@ -16,6 +17,7 @@ export function DriverContacts() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [overscheduledIds, setOverscheduledIds] = useState<Set<string>>(new Set());
   const searchRef = useRef<HTMLDivElement>(null);
+  const { hasPermission } = useAuth();
 
   const suggestions = searchQuery.trim()
     ? drivers
@@ -145,16 +147,18 @@ export function DriverContacts() {
   return (
     <div className="p-8 max-w-[1600px] mx-auto">
       <PageHeader title="Driver Contacts">
-        <button
-          onClick={() => {
-            setEditingDriver(null);
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-gray-800 transition-all shadow-lg shadow-gray-200"
-        >
-          <Plus size={20} />
-          Add New Driver
-        </button>
+        {hasPermission("drivers.add") && (
+          <button
+            onClick={() => {
+              setEditingDriver(null);
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-gray-800 transition-all shadow-lg shadow-gray-200"
+          >
+            <Plus size={20} />
+            Add New Driver
+          </button>
+        )}
       </PageHeader>
 
       <div className="relative w-64 mb-6" ref={searchRef}>
@@ -352,6 +356,11 @@ function DriverModal({
   onDelete: (id: string) => Promise<void>;
   driver: Driver | null;
 }) {
+  const { hasPermission } = useAuth();
+  const canChangeStatus = hasPermission("drivers.change_status");
+  const canDelete = hasPermission("drivers.delete");
+  const canSave = driver ? hasPermission("drivers.edit") : hasPermission("drivers.add");
+
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
@@ -392,6 +401,15 @@ function DriverModal({
     const formatted = formatPhoneNumber(e.target.value);
     setFormData({ ...formData, phone: formatted });
   };
+
+  // Appends a quick note tag (e.g. "Rescue Ready") to the free-text notes,
+  // skipping it if it's already present.
+  const appendNote = (tag: string) =>
+    setFormData((prev) => {
+      const existing = prev.notes || "";
+      if (existing.toLowerCase().includes(tag.toLowerCase())) return prev;
+      return { ...prev, notes: existing ? `${existing}\n${tag}`.trim() : tag };
+    });
 
   const save = async () => {
     // Basic validation
@@ -517,10 +535,11 @@ function DriverModal({
             </label>
             <select
               value={formData.status}
+              disabled={!canChangeStatus}
               onChange={(e) =>
                 setFormData({ ...formData, status: e.target.value as any })
               }
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-black/5"
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-black/5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option>Active</option>
               <option>Probation</option>
@@ -567,20 +586,29 @@ function DriverModal({
               <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
                 Notes / Remarks
               </label>
-              <button
-                type="button"
-                onClick={() =>
-                  setFormData({
-                    ...formData,
-                    notes: formData.notes
-                      ? `${formData.notes}\nRescue Ready`.trim()
-                      : "Rescue Ready",
-                  })
-                }
-                className="text-[10px] font-bold text-blue-500 hover:text-blue-600 bg-blue-50 px-2 py-0.5 rounded cursor-pointer transition-colors"
-              >
-                + Rescue Ready
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => appendNote("Rescue Ready")}
+                  className="text-[10px] font-bold text-blue-500 hover:text-blue-600 bg-blue-50 px-2 py-0.5 rounded cursor-pointer transition-colors active:scale-95"
+                >
+                  + Rescue Ready
+                </button>
+                <button
+                  type="button"
+                  onClick={() => appendNote("New Hire")}
+                  className="text-[10px] font-bold text-pink-500 hover:text-pink-600 bg-pink-50 px-2 py-0.5 rounded cursor-pointer transition-colors active:scale-95"
+                >
+                  + New Hire
+                </button>
+                <button
+                  type="button"
+                  onClick={() => appendNote("Probation")}
+                  className="text-[10px] font-bold text-red-500 hover:text-red-600 bg-red-50 px-2 py-0.5 rounded cursor-pointer transition-colors active:scale-95"
+                >
+                  + Probation
+                </button>
+              </div>
             </div>
             <textarea
               value={formData.notes || ""}
@@ -636,7 +664,7 @@ function DriverModal({
             </>
           ) : (
             <>
-              {driver && (
+              {driver && canDelete && (
                 <button
                   type="button"
                   onClick={() => setIsConfirmingDelete(true)}
@@ -653,20 +681,22 @@ function DriverModal({
                 onClick={onClose}
                 className="flex-1 px-6 py-3 rounded-xl border border-gray-100 font-bold text-gray-500 hover:bg-gray-50 transition-colors"
               >
-                Cancel
+                {canSave ? "Cancel" : "Close"}
               </button>
-              <button
-                onClick={save}
-                disabled={isSaving}
-                className={cn(
-                  "flex-1 px-6 py-3 rounded-xl bg-black text-white font-bold transition-all shadow-lg shadow-gray-200",
-                  isSaving
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-gray-800",
-                )}
-              >
-                {isSaving ? "Saving..." : "Save Driver"}
-              </button>
+              {canSave && (
+                <button
+                  onClick={save}
+                  disabled={isSaving}
+                  className={cn(
+                    "flex-1 px-6 py-3 rounded-xl bg-black text-white font-bold transition-all shadow-lg shadow-gray-200",
+                    isSaving
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-gray-800",
+                  )}
+                >
+                  {isSaving ? "Saving..." : "Save Driver"}
+                </button>
+              )}
             </>
           )}
         </div>

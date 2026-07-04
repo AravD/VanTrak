@@ -1,8 +1,8 @@
-import React from "react";
-import { Calendar, Users, CalendarOff, ClipboardList, Download } from "lucide-react";
+import { Calendar, Users, CalendarOff, ClipboardList, Download, UserCog } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { useAuth } from "../../app/auth-context";
 
-type Page = "schedule" | "contacts" | "timeoff" | "dailyreport" | "saveinfo";
+type Page = "schedule" | "contacts" | "timeoff" | "dailyreport" | "saveinfo" | "team";
 
 interface SidebarProps {
   activePage: Page;
@@ -12,6 +12,13 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activePage, onPageChange, onLogoClick }: SidebarProps) {
+  const { hasPermission } = useAuth();
+  const canSave = hasPermission("reports.export");
+  const canTeam =
+    hasPermission("admin.invite") ||
+    hasPermission("admin.permissions.edit") ||
+    hasPermission("admin.users.remove");
+
   return (
     <div className="w-16 h-screen border-r border-gray-100 bg-white flex flex-col items-center pt-8 pb-6 gap-8 fixed left-0 top-0">
       <button
@@ -88,21 +95,41 @@ export function Sidebar({ activePage, onPageChange, onLogoClick }: SidebarProps)
           )}
         </button>
 
-        <button
-          onClick={() => onPageChange("saveinfo")}
-          className={cn(
-            "p-3 rounded-xl transition-all duration-200 group relative",
-            activePage === "saveinfo"
-              ? "bg-black text-white shadow-lg"
-              : "text-gray-400 hover:text-black hover:bg-gray-50",
-          )}
-          title="Save Information"
-        >
-          <Download size={20} />
-          {activePage === "saveinfo" && (
-            <div className="absolute right-[-12px] top-1/2 -translate-y-1/2 w-1 h-4 bg-black rounded-full" />
-          )}
-        </button>
+        {canSave && (
+          <button
+            onClick={() => onPageChange("saveinfo")}
+            className={cn(
+              "p-3 rounded-xl transition-all duration-200 group relative",
+              activePage === "saveinfo"
+                ? "bg-black text-white shadow-lg"
+                : "text-gray-400 hover:text-black hover:bg-gray-50",
+            )}
+            title="Save Information"
+          >
+            <Download size={20} />
+            {activePage === "saveinfo" && (
+              <div className="absolute right-[-12px] top-1/2 -translate-y-1/2 w-1 h-4 bg-black rounded-full" />
+            )}
+          </button>
+        )}
+
+        {canTeam && (
+          <button
+            onClick={() => onPageChange("team")}
+            className={cn(
+              "p-3 rounded-xl transition-all duration-200 group relative",
+              activePage === "team"
+                ? "bg-black text-white shadow-lg"
+                : "text-gray-400 hover:text-black hover:bg-gray-50",
+            )}
+            title="Team & Access"
+          >
+            <UserCog size={20} />
+            {activePage === "team" && (
+              <div className="absolute right-[-12px] top-1/2 -translate-y-1/2 w-1 h-4 bg-black rounded-full" />
+            )}
+          </button>
+        )}
       </nav>
     </div>
   );

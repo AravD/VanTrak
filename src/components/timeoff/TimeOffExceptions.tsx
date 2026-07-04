@@ -18,6 +18,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { PageHeader } from "../common/PageHeader";
+import { useAuth } from "../../app/auth-context";
 
 interface Exception {
   id: string;
@@ -50,6 +51,9 @@ export function TimeOffExceptions() {
   const [editingException, setEditingException] = useState<Exception | null>(
     null,
   );
+  const { hasPermission } = useAuth();
+  const canEditSchedule = hasPermission("schedule.edit");
+  const canApprove = hasPermission("timeoff.approve");
 
   useEffect(() => {
     fetchExceptions();
@@ -111,16 +115,18 @@ export function TimeOffExceptions() {
   return (
     <div className="p-8 max-w-[1600px] mx-auto">
       <PageHeader title="Time Off Requests">
-        <button
-          onClick={() => {
-            setEditingException(null);
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-gray-800 transition-all shadow-lg shadow-gray-200"
-        >
-          <Plus size={20} />
-          Add Exception
-        </button>
+        {canEditSchedule && (
+          <button
+            onClick={() => {
+              setEditingException(null);
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-gray-800 transition-all shadow-lg shadow-gray-200"
+          >
+            <Plus size={20} />
+            Add Exception
+          </button>
+        )}
       </PageHeader>
 
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
@@ -207,22 +213,35 @@ export function TimeOffExceptions() {
                     className="px-6 py-4"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <button
-                      onClick={() =>
-                        handleStatusChange(
-                          exc.id,
-                          exc.status === "Pending" ? "Applied" : "Pending",
-                        )
-                      }
-                      className={cn(
-                        "px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-tighter transition-colors cursor-pointer",
-                        exc.status === "Pending"
-                          ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
-                          : "bg-green-50 text-green-700 border-green-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200",
-                      )}
-                    >
-                      {exc.status}
-                    </button>
+                    {canApprove ? (
+                      <button
+                        onClick={() =>
+                          handleStatusChange(
+                            exc.id,
+                            exc.status === "Pending" ? "Applied" : "Pending",
+                          )
+                        }
+                        className={cn(
+                          "px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-tighter transition-colors cursor-pointer",
+                          exc.status === "Pending"
+                            ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                            : "bg-green-50 text-green-700 border-green-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200",
+                        )}
+                      >
+                        {exc.status}
+                      </button>
+                    ) : (
+                      <span
+                        className={cn(
+                          "px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-tighter",
+                          exc.status === "Pending"
+                            ? "bg-red-50 text-red-600 border-red-200"
+                            : "bg-green-50 text-green-700 border-green-200",
+                        )}
+                      >
+                        {exc.status}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

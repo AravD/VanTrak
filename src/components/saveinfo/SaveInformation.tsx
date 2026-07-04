@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import ReactDatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { format, differenceInCalendarDays, parseISO } from 'date-fns';
+import { useState, useEffect } from "react";
+import ReactDatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { format, differenceInCalendarDays, parseISO } from "date-fns";
 import {
   Calendar,
   ClipboardList,
@@ -17,10 +17,10 @@ import {
   History,
   RotateCcw,
   ShieldCheck,
-} from 'lucide-react';
-import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { cn } from '../../lib/utils';
-import { PageHeader } from '../common/PageHeader';
+} from "lucide-react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+import { cn } from "../../lib/utils";
+import { PageHeader } from "../common/PageHeader";
 import {
   ExportSection,
   exportMasterSchedule,
@@ -31,16 +31,17 @@ import {
   fetchScheduledDeletions,
   cancelScheduledDeletion,
   ScheduledDeletion,
-} from '../../lib/saveExports';
+} from "../../lib/saveExports";
 
 // ── Automatic backup frequencies (UI only — no scheduling yet) ────────────────
 const FREQUENCIES = [
-  { id: '2w', label: 'Every 2 Weeks', sub: 'Bi-weekly' },
-  { id: '1m', label: 'Every Month', sub: 'Monthly' },
-  { id: '3m', label: 'Every 3 Months', sub: 'Quarterly' },
-  { id: '6m', label: 'Every 6 Months', sub: 'Semi-annual' },
+  { id: "1w", label: "Every Week", sub: "Weekly" },
+  { id: "2w", label: "Every 2 Weeks", sub: "Every other wFeek" },
+  { id: "1m", label: "Every Month", sub: "Monthly" },
+  { id: "3m", label: "Every 3 Months", sub: "Quarterly" },
+  { id: "6m", label: "Every 6 Months", sub: "Semi-annual" },
 ] as const;
-type FrequencyId = (typeof FREQUENCIES)[number]['id'];
+type FrequencyId = (typeof FREQUENCIES)[number]["id"];
 
 // ── Manual export sections — each gets a distinct icon + accent for clarity ───
 interface SectionDef {
@@ -58,57 +59,56 @@ interface SectionDef {
 
 const SECTIONS: SectionDef[] = [
   {
-    id: 'master_schedule',
-    name: 'Master Schedule',
-    description: 'Station assignments across the selected dates.',
+    id: "master_schedule",
+    name: "Master Schedule",
+    description: "Station assignments across the selected dates.",
     icon: Calendar,
-    accent: 'bg-blue-50 text-blue-600',
+    accent: "bg-blue-50 text-blue-600",
     usesRange: true,
   },
   {
-    id: 'daily_report',
-    name: 'Daily Report',
-    description: 'Roll call, operations & issues per day.',
+    id: "daily_report",
+    name: "Daily Report",
+    description: "Roll call, operations & issues per day.",
     icon: ClipboardList,
-    accent: 'bg-emerald-50 text-emerald-600',
+    accent: "bg-emerald-50 text-emerald-600",
     usesRange: true,
   },
   {
-    id: 'time_off',
-    name: 'Time Off & Exceptions',
-    description: 'Requests overlapping the selected dates.',
+    id: "time_off",
+    name: "Time Off & Exceptions",
+    description: "Requests overlapping the selected dates.",
     icon: CalendarOff,
-    accent: 'bg-amber-50 text-amber-600',
+    accent: "bg-amber-50 text-amber-600",
     usesRange: true,
   },
   {
-    id: 'driver_contacts',
-    name: 'Driver Contacts',
-    description: 'Full driver roster — kept in the app after download.',
+    id: "driver_contacts",
+    name: "Driver Contacts",
+    description: "Full driver roster — kept in the app after download.",
     icon: Users,
-    accent: 'bg-violet-50 text-violet-600',
+    accent: "bg-violet-50 text-violet-600",
     usesRange: false,
     retained: true,
   },
 ];
 
-const SECTION_BY_ID = Object.fromEntries(SECTIONS.map((s) => [s.id, s])) as Record<
-  ExportSection,
-  SectionDef
->;
+const SECTION_BY_ID = Object.fromEntries(
+  SECTIONS.map((s) => [s.id, s]),
+) as Record<ExportSection, SectionDef>;
 
 const fieldClass =
-  'w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-black/5 text-sm';
+  "w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-black/5 text-sm";
 
 // Strong ease-out — built-in CSS curves feel weak.
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
 
-const toStr = (d: Date | null) => (d ? format(d, 'yyyy-MM-dd') : '');
+const toStr = (d: Date | null) => (d ? format(d, "yyyy-MM-dd") : "");
 
 export function SaveInformation() {
   // Automatic backups — local state only (no functionality yet, per spec).
   const [autoEnabled, setAutoEnabled] = useState(false);
-  const [frequency, setFrequency] = useState<FrequencyId>('2w');
+  const [frequency, setFrequency] = useState<FrequencyId>("2w");
 
   // Manual export
   const [rangeStart, setRangeStart] = useState<Date | null>(null);
@@ -116,9 +116,11 @@ export function SaveInformation() {
   const [busySection, setBusySection] = useState<ExportSection | null>(null);
 
   // Post-download notice ("data will be deleted in 30 days", or retained)
-  const [notice, setNotice] = useState<
-    { name: string; expiresAt: string | null; retained: boolean } | null
-  >(null);
+  const [notice, setNotice] = useState<{
+    name: string;
+    expiresAt: string | null;
+    retained: boolean;
+  } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Scheduled deletions (restore section)
@@ -144,7 +146,7 @@ export function SaveInformation() {
     if (ok) {
       setDeletions((prev) => prev.filter((d) => d.id !== id));
     } else {
-      setErrorMsg('Could not cancel the deletion. Please try again.');
+      setErrorMsg("Could not cancel the deletion. Please try again.");
     }
     setRestoringId(null);
   };
@@ -153,7 +155,8 @@ export function SaveInformation() {
   const endStr = toStr(rangeEnd);
   const rangeValid = !!startStr && !!endStr && startStr <= endStr;
 
-  const canExport = (section: SectionDef) => (section.usesRange ? rangeValid : true);
+  const canExport = (section: SectionDef) =>
+    section.usesRange ? rangeValid : true;
 
   const handleExport = async (section: SectionDef) => {
     if (busySection || !canExport(section)) return;
@@ -162,16 +165,16 @@ export function SaveInformation() {
     try {
       let rows = 0;
       switch (section.id) {
-        case 'master_schedule':
+        case "master_schedule":
           rows = await exportMasterSchedule(startStr, endStr);
           break;
-        case 'daily_report':
+        case "daily_report":
           rows = await exportDailyReport(startStr, endStr);
           break;
-        case 'time_off':
+        case "time_off":
           rows = await exportTimeOff(startStr, endStr);
           break;
-        case 'driver_contacts':
+        case "driver_contacts":
           rows = await exportDriverContacts();
           break;
       }
@@ -189,10 +192,16 @@ export function SaveInformation() {
         // Surface the new scheduled deletion in the restore section.
         refreshDeletions();
       }
-      setNotice({ name: section.name, expiresAt, retained: !!section.retained });
+      setNotice({
+        name: section.name,
+        expiresAt,
+        retained: !!section.retained,
+      });
     } catch (e: any) {
-      console.error('Export failed:', e);
-      setErrorMsg(`Could not export ${section.name}: ${e.message ?? 'unknown error'}`);
+      console.error("Export failed:", e);
+      setErrorMsg(
+        `Could not export ${section.name}: ${e.message ?? "unknown error"}`,
+      );
     } finally {
       setBusySection(null);
     }
@@ -226,14 +235,14 @@ export function SaveInformation() {
             aria-checked={autoEnabled}
             onClick={() => setAutoEnabled((v) => !v)}
             className={cn(
-              'relative w-12 h-7 rounded-full shrink-0 transition-colors duration-200 ease-out cursor-pointer active:scale-95',
-              autoEnabled ? 'bg-black' : 'bg-gray-200',
+              "relative w-12 h-7 rounded-full shrink-0 transition-colors duration-200 ease-out cursor-pointer active:scale-95",
+              autoEnabled ? "bg-black" : "bg-gray-200",
             )}
           >
             <span
               className={cn(
-                'absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]',
-                autoEnabled ? 'translate-x-5' : 'translate-x-0',
+                "absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]",
+                autoEnabled ? "translate-x-5" : "translate-x-0",
               )}
             />
           </button>
@@ -242,14 +251,16 @@ export function SaveInformation() {
         {/* Frequency cards */}
         <div
           className={cn(
-            'px-6 py-5 transition-opacity duration-200',
-            autoEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none select-none',
+            "px-6 py-5 transition-opacity duration-200",
+            autoEnabled
+              ? "opacity-100"
+              : "opacity-40 pointer-events-none select-none",
           )}
         >
           <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-1.5">
             <Power size={11} /> Backup frequency
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {FREQUENCIES.map((f) => {
               const active = frequency === f.id;
               return (
@@ -258,25 +269,27 @@ export function SaveInformation() {
                   type="button"
                   onClick={() => setFrequency(f.id)}
                   className={cn(
-                    'group relative text-left px-4 py-3.5 rounded-xl border transition-[transform,border-color,background-color] duration-150 ease-out cursor-pointer active:scale-[0.97]',
+                    "group relative text-left px-4 py-3.5 rounded-xl border transition-[transform,border-color,background-color] duration-150 ease-out cursor-pointer active:scale-[0.97]",
                     active
-                      ? 'border-black bg-black text-white shadow-sm'
-                      : 'border-gray-100 bg-gray-50/50 hover:border-gray-300 hover:bg-gray-50',
+                      ? "border-black bg-black text-white shadow-sm"
+                      : "border-gray-100 bg-gray-50/50 hover:border-gray-300 hover:bg-gray-50",
                   )}
                 >
-                  <span className="block text-sm font-bold tracking-tight">{f.label}</span>
+                  <span className="block text-sm font-bold tracking-tight">
+                    {f.label}
+                  </span>
                   <span
                     className={cn(
-                      'block text-[11px] font-medium mt-0.5',
-                      active ? 'text-white/60' : 'text-gray-400',
+                      "block text-[11px] font-medium mt-0.5",
+                      active ? "text-white/60" : "text-gray-400",
                     )}
                   >
                     {f.sub}
                   </span>
                   <span
                     className={cn(
-                      'absolute top-3 right-3 w-4 h-4 rounded-full flex items-center justify-center transition-all duration-150 ease-out',
-                      active ? 'bg-white scale-100' : 'scale-0',
+                      "absolute top-3 right-3 w-4 h-4 rounded-full flex items-center justify-center transition-all duration-150 ease-out",
+                      active ? "bg-white scale-100" : "scale-0",
                     )}
                   >
                     <Check size={11} className="text-black" strokeWidth={3} />
@@ -355,7 +368,8 @@ export function SaveInformation() {
           {SECTIONS.map((section) => {
             const Icon = section.icon;
             const busy = busySection === section.id;
-            const disabled = !canExport(section) || (busySection !== null && !busy);
+            const disabled =
+              !canExport(section) || (busySection !== null && !busy);
             return (
               <div
                 key={section.id}
@@ -364,7 +378,7 @@ export function SaveInformation() {
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div
                     className={cn(
-                      'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+                      "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
                       section.accent,
                     )}
                   >
@@ -392,10 +406,10 @@ export function SaveInformation() {
                   onClick={() => handleExport(section)}
                   disabled={disabled}
                   className={cn(
-                    'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold shrink-0 transition-[transform,background-color,opacity] duration-150 ease-out',
+                    "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold shrink-0 transition-[transform,background-color,opacity] duration-150 ease-out",
                     disabled
-                      ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                      : 'bg-black text-white hover:bg-gray-800 active:scale-[0.97] shadow-sm cursor-pointer',
+                      ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                      : "bg-black text-white hover:bg-gray-800 active:scale-[0.97] shadow-sm cursor-pointer",
                   )}
                 >
                   {busy ? (
@@ -427,7 +441,8 @@ export function SaveInformation() {
               Scheduled Deletions
             </h2>
             <p className="text-sm text-gray-400 font-medium">
-              Exported data is removed after 30 days. Restore an item to keep it in the app.
+              Exported data is removed after 30 days. Restore an item to keep it
+              in the app.
             </p>
           </div>
         </div>
@@ -435,7 +450,10 @@ export function SaveInformation() {
         {deletionsLoading ? (
           <div className="divide-y divide-gray-100">
             {[0, 1].map((i) => (
-              <div key={i} className="flex items-center justify-between gap-4 px-6 py-4">
+              <div
+                key={i}
+                className="flex items-center justify-between gap-4 px-6 py-4"
+              >
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-xl bg-gray-100 animate-pulse" />
                   <div className="space-y-2">
@@ -452,9 +470,12 @@ export function SaveInformation() {
             <div className="w-11 h-11 rounded-2xl bg-gray-50 text-gray-300 flex items-center justify-center mb-3">
               <ShieldCheck size={20} />
             </div>
-            <p className="text-sm font-bold text-black">Nothing scheduled for deletion</p>
+            <p className="text-sm font-bold text-black">
+              Nothing scheduled for deletion
+            </p>
             <p className="text-[12px] text-gray-400 font-medium mt-0.5 max-w-xs">
-              Anything you export with a deletion timer will show up here, ready to restore.
+              Anything you export with a deletion timer will show up here, ready
+              to restore.
             </p>
           </div>
         ) : (
@@ -469,8 +490,8 @@ export function SaveInformation() {
                 );
                 const rangeLabel =
                   d.range_start && d.range_end
-                    ? `${format(parseISO(d.range_start), 'MMM d')} – ${format(parseISO(d.range_end), 'MMM d, yyyy')}`
-                    : 'All data';
+                    ? `${format(parseISO(d.range_start), "MMM d")} – ${format(parseISO(d.range_end), "MMM d, yyyy")}`
+                    : "All data";
                 const restoring = restoringId === d.id;
                 return (
                   <motion.div
@@ -478,15 +499,23 @@ export function SaveInformation() {
                     layout
                     initial={{ opacity: 0, y: reduce ? 0 : 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: reduce ? 0 : 8, transition: { duration: 0.18, ease: EASE_OUT } }}
-                    transition={{ duration: 0.3, ease: EASE_OUT, delay: reduce ? 0 : i * 0.04 }}
+                    exit={{
+                      opacity: 0,
+                      x: reduce ? 0 : 8,
+                      transition: { duration: 0.18, ease: EASE_OUT },
+                    }}
+                    transition={{
+                      duration: 0.3,
+                      ease: EASE_OUT,
+                      delay: reduce ? 0 : i * 0.04,
+                    }}
                     className="flex items-center justify-between gap-4 px-6 py-4 transition-colors hover:bg-gray-50/50"
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div
                         className={cn(
-                          'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-                          meta?.accent ?? 'bg-gray-50 text-gray-500',
+                          "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                          meta?.accent ?? "bg-gray-50 text-gray-500",
                         )}
                       >
                         <Icon size={18} />
@@ -497,11 +526,12 @@ export function SaveInformation() {
                             {meta?.name ?? d.section}
                           </h3>
                           <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded shrink-0">
-                            {daysLeft === 0 ? 'Today' : `${daysLeft}d left`}
+                            {daysLeft === 0 ? "Today" : `${daysLeft}d left`}
                           </span>
                         </div>
                         <p className="text-[12px] text-gray-400 font-medium truncate">
-                          {rangeLabel} · deletes {format(parseISO(d.expires_at), 'MMM d, yyyy')}
+                          {rangeLabel} · deletes{" "}
+                          {format(parseISO(d.expires_at), "MMM d, yyyy")}
                         </p>
                       </div>
                     </div>
@@ -511,11 +541,11 @@ export function SaveInformation() {
                       onClick={() => handleRestore(d.id)}
                       disabled={restoring}
                       className={cn(
-                        'flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold shrink-0 border bg-white shadow-sm',
-                        'transition-[transform,background-color,border-color] duration-150 ease-out',
+                        "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold shrink-0 border bg-white shadow-sm",
+                        "transition-[transform,background-color,border-color] duration-150 ease-out",
                         restoring
-                          ? 'text-gray-300 border-gray-100 cursor-wait'
-                          : 'text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-[0.97] cursor-pointer',
+                          ? "text-gray-300 border-gray-100 cursor-wait"
+                          : "text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-[0.97] cursor-pointer",
                       )}
                     >
                       {restoring ? (
@@ -547,11 +577,17 @@ export function SaveInformation() {
             <div className="flex items-start gap-3 p-4">
               <div
                 className={cn(
-                  'w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
-                  notice.retained ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600',
+                  "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+                  notice.retained
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "bg-amber-50 text-amber-600",
                 )}
               >
-                {notice.retained ? <Check size={17} strokeWidth={3} /> : <ShieldAlert size={17} />}
+                {notice.retained ? (
+                  <Check size={17} strokeWidth={3} />
+                ) : (
+                  <ShieldAlert size={17} />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold tracking-tight text-black">
@@ -559,13 +595,13 @@ export function SaveInformation() {
                 </p>
                 <p className="text-[12px] text-gray-500 font-medium leading-relaxed mt-0.5">
                   {notice.retained ? (
-                    'This data stays in the app — it is not deleted.'
+                    "This data stays in the app — it is not deleted."
                   ) : (
                     <>
                       This data will be deleted from the app
                       {notice.expiresAt
-                        ? ` on ${format(new Date(notice.expiresAt), 'MMM d, yyyy')}`
-                        : ' in 30 days'}
+                        ? ` on ${format(new Date(notice.expiresAt), "MMM d, yyyy")}`
+                        : " in 30 days"}
                       . It is saved in your downloaded file.
                     </>
                   )}

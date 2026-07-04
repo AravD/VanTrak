@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Check, AlertCircle, ChevronDown } from 'lucide-react';
 import { cn, normalizeTimeInput } from '../../lib/utils';
 import { OperationsRow, RollCallDriver } from '../../types/driver';
+import { TableSkeleton } from './TableSkeleton';
+import { TableEmpty } from './TableEmpty';
 
 function routeStatusColor(value: string) {
   if (value === 'Finished') return 'border-green-200 bg-green-50 text-green-800';
@@ -40,11 +42,18 @@ export function OperationsTable({
     onRowChange(driverId, field, normalizeTimeInput(raw));
 
   if (loading) {
-    return <div className="py-20 text-center text-gray-400 italic text-sm">Loading operations...</div>;
+    return (
+      <div className="space-y-6">
+        <TableSkeleton columns={5} rows={5} />
+        <TableSkeleton columns={5} rows={5} />
+      </div>
+    );
   }
 
   if (rows.length === 0) {
-    return <div className="py-20 text-center text-gray-400 italic text-sm">No drivers scheduled for this date.</div>;
+    return (
+      <TableEmpty message="No one is scheduled for this date, so there are no routes to track yet." />
+    );
   }
 
   const inputClass =

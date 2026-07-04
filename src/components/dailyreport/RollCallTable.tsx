@@ -2,6 +2,8 @@ import React from 'react';
 import { Check, AlertCircle } from 'lucide-react';
 import { cn, normalizeTimeInput } from '../../lib/utils';
 import { RollCallRow, RollCallDriver } from '../../types/driver';
+import { TableSkeleton } from './TableSkeleton';
+import { TableEmpty } from './TableEmpty';
 
 function getRoleOptions(notes: string | null): string[] {
   const n = (notes || '').toLowerCase();
@@ -50,18 +52,12 @@ export function RollCallTable({
   onSave,
 }: RollCallTableProps) {
   if (loading) {
-    return (
-      <div className="py-20 text-center text-gray-400 italic text-sm">
-        Loading roll call...
-      </div>
-    );
+    return <TableSkeleton columns={8} />;
   }
 
   if (rows.length === 0) {
     return (
-      <div className="py-20 text-center text-gray-400 italic text-sm">
-        No drivers scheduled for this date.
-      </div>
+      <TableEmpty message="No one is scheduled for this date, so there's nothing to roll-call yet." />
     );
   }
 

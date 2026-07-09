@@ -53,6 +53,7 @@ export function CreateBusiness() {
     // Pull in the new admin/approved membership, then enter the app. No default
     // station is created — the user sets those up on the Schedule page.
     await refreshMembership();
+    localStorage.setItem('activePage', 'schedule'); // greet new users on the schedule
     navigate('/', { replace: true });
   };
 

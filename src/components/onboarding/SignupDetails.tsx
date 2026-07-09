@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
-import { Mail } from 'lucide-react';
-import { OnboardingShell } from './OnboardingShell';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { supabase } from '../../lib/supabase';
-import { formatPhone } from '../../lib/phone';
-import { SIGNUP_EMAIL_KEY } from '../auth/auth-page';
-import { DARK_INPUT_CLASS, PANEL_BUTTON_CLASS } from '../auth/AuthLayout';
+import { useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { Mail } from "lucide-react";
+import { OnboardingShell } from "./OnboardingShell";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { supabase } from "../../lib/supabase";
+import { formatPhone } from "../../lib/phone";
+import { SIGNUP_EMAIL_KEY } from "../auth/auth-page";
+import { DARK_INPUT_CLASS, PANEL_BUTTON_CLASS } from "../auth/AuthLayout";
 
 /**
  * Pre-login signup wizard. Collects profile details + the business name, then
@@ -18,11 +18,11 @@ export function SignupDetails() {
   const navigate = useNavigate();
   // Capture once at mount: clearing the stored email after sending must not
   // re-trigger the "no email" redirect guard below.
-  const [email] = useState(() => localStorage.getItem(SIGNUP_EMAIL_KEY) ?? '');
+  const [email] = useState(() => localStorage.getItem(SIGNUP_EMAIL_KEY) ?? "");
 
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [businessName, setBusinessName] = useState('');
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [businessName, setBusinessName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -58,7 +58,11 @@ export function SignupDetails() {
       localStorage.removeItem(SIGNUP_EMAIL_KEY);
       setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -66,21 +70,27 @@ export function SignupDetails() {
 
   if (sent) {
     return (
-      <OnboardingShell title="Check your email" subtitle="One last step to complete your sign-up." center>
+      <OnboardingShell
+        title="Check your email"
+        subtitle="One last step to complete your sign-up."
+        center
+      >
         <div className="flex flex-col items-center gap-4 text-center">
           <span className="flex size-12 items-center justify-center rounded-full bg-white/10 text-white">
             <Mail className="size-6" />
           </span>
           <p className="text-sm leading-relaxed text-white/60">
-            We sent a confirmation link to{' '}
-            <span className="font-medium text-white">{email}</span>. Click it to finish
-            creating <span className="font-medium text-white">{businessName}</span> and sign in.
+            We sent a confirmation link to{" "}
+            <span className="font-medium text-white">{email}</span>. Click it to
+            finish creating{" "}
+            <span className="font-medium text-white">{businessName}</span> and
+            sign in.
           </p>
           <p className="text-xs text-white/40">
-            Didn't get it? Check your spam folder, or{' '}
+            Didn't get it? Check your spam folder, or{" "}
             <button
               type="button"
-              onClick={() => navigate('/entry')}
+              onClick={() => navigate("/entry")}
               className="text-white/70 underline underline-offset-4 transition-colors hover:text-white"
             >
               start over
@@ -140,15 +150,17 @@ export function SignupDetails() {
           disabled={submitting || !fullName.trim() || !businessName.trim()}
           className={PANEL_BUTTON_CLASS}
         >
-          {submitting ? 'Sending…' : 'Send email link'}
+          {submitting ? "Sending…" : "Create account"}
         </Button>
 
-        {error && <p className="text-xs leading-relaxed text-red-300">{error}</p>}
+        {error && (
+          <p className="text-xs leading-relaxed text-red-300">{error}</p>
+        )}
       </form>
 
       <button
         type="button"
-        onClick={() => navigate('/entry')}
+        onClick={() => navigate("/entry")}
         className="mt-3 block text-sm text-white/55 underline underline-offset-4 transition-colors hover:text-white"
       >
         ← Back
@@ -170,9 +182,14 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="flex items-center justify-between text-xs font-medium text-white/60">
+      <label
+        htmlFor={id}
+        className="flex items-center justify-between text-xs font-medium text-white/60"
+      >
         {label}
-        {optional && <span className="font-normal text-white/35">Optional</span>}
+        {optional && (
+          <span className="font-normal text-white/35">Optional</span>
+        )}
       </label>
       {children}
     </div>

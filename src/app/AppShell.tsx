@@ -29,7 +29,8 @@ export function AppShell() {
       <Sidebar
         activePage={activePage}
         onPageChange={handlePageChange}
-        onLogoClick={signOut}
+        onLogoClick={() => handlePageChange('schedule')}
+        onSignOut={signOut}
       />
 
       <RolePreviewSwitcher />

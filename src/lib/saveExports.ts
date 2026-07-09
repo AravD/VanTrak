@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { downloadWorkbook, tableSheet } from './export';
+import { exportMasterScheduleStyled } from './scheduleExport';
 
 /**
  * Date-range exports for the Save Information page.
@@ -37,35 +38,9 @@ async function nameMaps() {
 }
 
 // ── Master Schedule ──────────────────────────────────────────────────────────
+// Produces the styled, on-screen week grid (one sheet per week) — see scheduleExport.ts.
 export async function exportMasterSchedule(start: string, end: string): Promise<number> {
-  const { driverName, stationName } = await nameMaps();
-  const { data, error } = await supabase
-    .from('schedule_assignments')
-    .select('work_date, station_id, driver_id, role_assignment, assignment_status, shift_start, shift_end, notes')
-    .gte('work_date', start)
-    .lte('work_date', end)
-    .order('work_date', { ascending: true });
-  if (error) throw error;
-  const rows = data ?? [];
-
-  downloadWorkbook(`Master Schedule ${start} to ${end}`, [
-    tableSheet(
-      'Assignments',
-      [
-        { header: 'Date', value: (r: any) => r.work_date, width: 14 },
-        { header: 'Station', value: (r: any) => stationName(r.station_id), width: 18 },
-        { header: 'Driver', value: (r: any) => driverName.get(r.driver_id) ?? '', width: 22 },
-        { header: 'Role', value: (r: any) => r.role_assignment, width: 14 },
-        { header: 'Status', value: (r: any) => r.assignment_status, width: 14 },
-        { header: 'Shift Start', value: (r: any) => trimTime(r.shift_start), width: 12 },
-        { header: 'Shift End', value: (r: any) => trimTime(r.shift_end), width: 12 },
-        { header: 'Notes', value: (r: any) => r.notes, width: 40 },
-      ],
-      rows,
-    ),
-  ]);
-
-  return rows.length;
+  return exportMasterScheduleStyled(start, end);
 }
 
 // ── Daily Report ─────────────────────────────────────────────────────────────

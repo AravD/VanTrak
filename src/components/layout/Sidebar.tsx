@@ -1,4 +1,4 @@
-import { Calendar, Users, CalendarOff, ClipboardList, Download, UserCog } from "lucide-react";
+import { Calendar, Users, CalendarOff, ClipboardList, Download, UserCog, LogOut } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../app/auth-context";
 
@@ -7,11 +7,13 @@ type Page = "schedule" | "contacts" | "timeoff" | "dailyreport" | "saveinfo" | "
 interface SidebarProps {
   activePage: Page;
   onPageChange: (page: Page) => void;
-  /** Returns to the auth/landing page. */
+  /** Go home to the main (schedule) page. */
   onLogoClick: () => void;
+  /** Sign out of the app. */
+  onSignOut: () => void;
 }
 
-export function Sidebar({ activePage, onPageChange, onLogoClick }: SidebarProps) {
+export function Sidebar({ activePage, onPageChange, onLogoClick, onSignOut }: SidebarProps) {
   const { hasPermission } = useAuth();
   const canSave = hasPermission("reports.export");
   const canTeam =
@@ -23,8 +25,8 @@ export function Sidebar({ activePage, onPageChange, onLogoClick }: SidebarProps)
     <div className="w-16 h-screen border-r border-gray-100 bg-white flex flex-col items-center pt-8 pb-6 gap-8 fixed left-0 top-0">
       <button
         onClick={onLogoClick}
-        title="Landing page"
-        aria-label="Go to landing page"
+        title="Home"
+        aria-label="Go to the main schedule page"
         className="text-black font-bold text-3xl tracking-tighter mt-1.5 mb-6 transition-transform duration-150 ease-out hover:scale-105 active:scale-95 cursor-pointer"
       >
         VT
@@ -131,6 +133,15 @@ export function Sidebar({ activePage, onPageChange, onLogoClick }: SidebarProps)
           </button>
         )}
       </nav>
+
+      <button
+        onClick={onSignOut}
+        title="Sign out"
+        aria-label="Sign out"
+        className="mt-auto p-3 rounded-xl text-gray-400 transition-all duration-200 hover:text-black hover:bg-gray-50 active:scale-95"
+      >
+        <LogOut size={20} />
+      </button>
     </div>
   );
 }

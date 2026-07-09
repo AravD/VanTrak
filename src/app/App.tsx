@@ -8,7 +8,6 @@ import { SignupDetails } from '../components/onboarding/SignupDetails';
 import { AcceptInvite } from '../components/onboarding/AcceptInvite';
 import { ApplyOnboarding } from '../components/onboarding/ApplyOnboarding';
 import { CreateBusiness } from '../components/onboarding/CreateBusiness';
-import { JoinBusiness } from '../components/onboarding/JoinBusiness';
 import { PendingApproval } from '../components/onboarding/PendingApproval';
 
 // Neutral splash while the initial session/membership lookup resolves — avoids
@@ -85,7 +84,6 @@ function AppRoutes() {
       <Route path="/signup/details" element={<RequireNoSession><SignupDetails /></RequireNoSession>} />
       <Route path="/signup" element={<RequireOnboarding><SignupChoice /></RequireOnboarding>} />
       <Route path="/create-business" element={<RequireOnboarding><CreateBusiness /></RequireOnboarding>} />
-      <Route path="/join-business" element={<RequireOnboarding><JoinBusiness /></RequireOnboarding>} />
       <Route path="/pending-approval" element={<RequireOnboarding><PendingApproval /></RequireOnboarding>} />
       <Route path="/*" element={<RequireApp><AppShell /></RequireApp>} />
     </Routes>

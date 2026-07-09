@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { OnboardingShell } from './OnboardingShell';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { supabase } from '../../lib/supabase';
+import { formatPhone } from '../../lib/phone';
 import { useAuth } from '../../app/auth-context';
-import { PANEL_BUTTON_CLASS } from '../auth/AuthLayout';
+import { PANEL_BUTTON_CLASS, DARK_INPUT_CLASS } from '../auth/AuthLayout';
 
 interface InvitePreview {
   business_name: string;
@@ -14,9 +16,11 @@ interface InvitePreview {
 }
 
 /**
- * Public landing for an invite link (/invite/:token). Signed-out users get a
- * magic link carrying the token; on return, ApplyOnboarding calls accept_invite.
- * Signed-in users accept immediately.
+ * Public landing for an invite link (/invite/:token). Collects the joiner's
+ * name (required) + phone (optional), then:
+ *   - signed-in users: saves them to the profile and accepts immediately.
+ *   - signed-out users: carries them in the sign-up metadata via the magic link;
+ *     ApplyOnboarding calls accept_invite on return.
  */
 export function AcceptInvite() {
   const { token } = useParams<{ token: string }>();
@@ -28,6 +32,10 @@ export function AcceptInvite() {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -42,10 +50,18 @@ export function AcceptInvite() {
     })();
   }, [token]);
 
+  const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+  const nameReady = firstName.trim().length > 0 && lastName.trim().length > 0;
+
   const acceptNow = async () => {
     if (!token) return;
     setError(null);
     setWorking(true);
+    // Save the joiner's details on their profile before joining.
+    const uid = session?.user.id;
+    if (uid) {
+      await supabase.from('profiles').update({ full_name: fullName, phone: phone.trim() || null }).eq('id', uid);
+    }
     const { error } = await supabase.rpc('accept_invite', { p_token: token });
     if (error) {
       setError(error.message);
@@ -65,7 +81,7 @@ export function AcceptInvite() {
       options: {
         shouldCreateUser: true,
         emailRedirectTo: window.location.origin,
-        data: { pending_invite_token: token },
+        data: { full_name: fullName, phone: phone.trim() || null, pending_invite_token: token },
       },
     });
     setWorking(false);
@@ -105,17 +121,44 @@ export function AcceptInvite() {
   return (
     <OnboardingShell
       title={`Join ${invite.business_name}`}
-      subtitle={`You've been invited as ${invite.role_name}.`}
+      subtitle={`You've been invited as ${invite.role_name}. Tell us who you are to get started.`}
     >
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm">
           <span className="text-white/50">Invite for </span>
           <span className="font-medium text-white">{invite.email}</span>
         </div>
 
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label htmlFor="first" className="block text-xs font-medium text-white/60">First name</label>
+            <Input id="first" value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={working} autoFocus className={DARK_INPUT_CLASS} />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="last" className="block text-xs font-medium text-white/60">Last name</label>
+            <Input id="last" value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={working} className={DARK_INPUT_CLASS} />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="phone" className="flex items-center justify-between text-xs font-medium text-white/60">
+            Phone number <span className="font-normal text-white/35">Optional</span>
+          </label>
+          <Input
+            id="phone"
+            type="tel"
+            inputMode="numeric"
+            maxLength={12}
+            value={phone}
+            onChange={(e) => setPhone(formatPhone(e.target.value))}
+            disabled={working}
+            className={DARK_INPUT_CLASS}
+          />
+        </div>
+
         <Button
           onClick={session ? acceptNow : acceptViaEmail}
-          disabled={working}
+          disabled={working || !nameReady}
           size="lg"
           className={PANEL_BUTTON_CLASS}
         >

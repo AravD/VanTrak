@@ -99,38 +99,7 @@ export function AuthPage() {
     <AuthLayout>
       <motion.div variants={itemVariants} className="space-y-1.5">
         <h1 className="font-heading text-3xl font-bold tracking-tight">Sign in or join</h1>
-        <p className="text-sm text-white/55">Use a provider or your email to continue.</p>
-      </motion.div>
-
-      <motion.div variants={itemVariants} className="space-y-2.5">
-        {PROVIDERS.map(({ id, Icon, label }) => (
-          <Button
-            key={id}
-            type="button"
-            size="lg"
-            disabled={pending !== null}
-            onClick={() => handleOAuth(id)}
-            className={BUTTON_CLASS}
-          >
-            <Icon className="size-4" />
-            {pending === id ? 'Redirecting…' : label}
-          </Button>
-        ))}
-
-        <Button
-          type="button"
-          size="lg"
-          disabled={pending !== null}
-          onClick={handleGuest}
-          className={BUTTON_CLASS}
-        >
-          <UserRound className="size-4" />
-          Continue as guest
-        </Button>
-      </motion.div>
-
-      <motion.div variants={itemVariants}>
-        <AuthSeparator />
+        <p className="text-sm text-white/55">Enter your email or use a provider to continue.</p>
       </motion.div>
 
       <motion.form variants={itemVariants} className="space-y-2.5" onSubmit={handleContinue}>
@@ -168,6 +137,37 @@ export function AuthPage() {
           Check your inbox — we sent a sign-in link to {email}.
         </motion.p>
       )}
+
+      <motion.div variants={itemVariants}>
+        <AuthSeparator />
+      </motion.div>
+
+      <motion.div variants={itemVariants} className="space-y-2.5">
+        {PROVIDERS.map(({ id, Icon, label }) => (
+          <Button
+            key={id}
+            type="button"
+            size="lg"
+            disabled={pending !== null}
+            onClick={() => handleOAuth(id)}
+            className={BUTTON_CLASS}
+          >
+            <Icon className="size-4" />
+            {pending === id ? 'Redirecting…' : label}
+          </Button>
+        ))}
+
+        <Button
+          type="button"
+          size="lg"
+          disabled={pending !== null}
+          onClick={handleGuest}
+          className={BUTTON_CLASS}
+        >
+          <UserRound className="size-4" />
+          Continue as guest
+        </Button>
+      </motion.div>
 
       <motion.p variants={itemVariants} className="text-xs leading-relaxed text-white/40">
         By continuing, you agree to our{' '}

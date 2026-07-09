@@ -23,6 +23,21 @@ export async function sendAppEmail(input: SendEmailInput): Promise<{ id: string 
       reply_to: input.replyTo,
     },
   });
-  if (error) throw error;
+  if (error) {
+    // A FunctionsHttpError carries the raw Response; pull out Resend's real
+    // reason + the `from` used so the caller can show something actionable.
+    let message = error.message;
+    const ctx = (error as { context?: Response }).context;
+    if (ctx && typeof ctx.json === 'function') {
+      try {
+        const body = (await ctx.json()) as { from?: string; error?: string; details?: { message?: string; name?: string } };
+        const reason = body?.details?.message || body?.details?.name || body?.error;
+        if (reason) message = body?.from ? `${reason} (from: ${body.from})` : reason;
+      } catch {
+        /* fall back to the generic message */
+      }
+    }
+    throw new Error(message);
+  }
   return data as { id: string };
 }

@@ -36,7 +36,7 @@ import {
 // ── Automatic backup frequencies (UI only — no scheduling yet) ────────────────
 const FREQUENCIES = [
   { id: "1w", label: "Every Week", sub: "Weekly" },
-  { id: "2w", label: "Every 2 Weeks", sub: "Every other wFeek" },
+  { id: "2w", label: "Every 2 Weeks", sub: "Every other week" },
   { id: "1m", label: "Every Month", sub: "Monthly" },
   { id: "3m", label: "Every 3 Months", sub: "Quarterly" },
   { id: "6m", label: "Every 6 Months", sub: "Semi-annual" },

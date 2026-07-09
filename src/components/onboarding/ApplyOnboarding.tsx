@@ -23,6 +23,9 @@ export function ApplyOnboarding() {
       const inviteToken = meta.pending_invite_token as string | undefined;
       const businessName = meta.pending_business_name as string | undefined;
 
+      // First entry into the app → greet new users on the Master Schedule.
+      localStorage.setItem('activePage', 'schedule');
+
       // Invited user: accept the invite (joins the inviter's business with a role).
       if (inviteToken) {
         const { error: rpcError } = await supabase.rpc('accept_invite', { p_token: inviteToken });

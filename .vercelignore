@@ -1,0 +1,4 @@
+# The FastAPI backend is deployed separately (Docker + AWS), NOT on Vercel.
+# Excluding it here keeps Vercel from treating this as a multi-service project.
+services/
+docker-compose.yml

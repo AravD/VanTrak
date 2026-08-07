@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format, addDays, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -6,11 +6,12 @@ import { cn } from '../../lib/utils';
 import { RollCallRow, RollCallDriver, OperationsRow, DailyIssue, DailyAlert } from '../../types/driver';
 import { RollCallTable } from './RollCallTable';
 import { OperationsTable } from './OperationsTable';
+import { RescuesTab } from './RescuesTab';
 import { IssuesTab } from './IssuesTab';
 import { AlertsTab } from './AlertsTab';
 import { PageHeader } from '../common/PageHeader';
 
-const SUB_TABS = ['Roll Call', 'Operations', 'Issues', 'Alerts'] as const;
+const SUB_TABS = ['Roll Call', 'Operations', 'Rescues', 'Issues', 'Alerts'] as const;
 type SubTab = (typeof SUB_TABS)[number];
 
 interface Station {
@@ -46,6 +47,11 @@ export function DailyReport() {
   // Alerts state — auto-derived (read-only) from the daily_alerts DB view
   const [dailyAlerts, setDailyAlerts] = useState<DailyAlert[]>([]);
 
+  // Track the visible date so an async alert refresh can't overwrite the view
+  // after the user has navigated to another day.
+  const selectedDateRef = useRef(selectedDate);
+  useEffect(() => { selectedDateRef.current = selectedDate; }, [selectedDate]);
+
   useEffect(() => {
     loadData(selectedDate);
     loadIssues(selectedDate);
@@ -66,7 +72,7 @@ export function DailyReport() {
       .from('daily_alerts')
       .select('*')
       .eq('report_date', date);
-    if (!error && data) setDailyAlerts(data as DailyAlert[]);
+    if (!error && data && selectedDateRef.current === date) setDailyAlerts(data as DailyAlert[]);
   };
 
   const loadData = async (date: string) => {
@@ -206,24 +212,26 @@ export function DailyReport() {
     setLoading(false);
   };
 
-  // ── Roll Call handlers ─────────────────────────────────────────────────────
+  // ── Autosave plumbing ──────────────────────────────────────────────────────
+  // Roll Call + Operations write to the same daily_roll_call row (keyed by
+  // report_date + driver_id); each upsert only sends its own columns, so they
+  // never clobber each other. Refs hold the latest rows so a debounced save
+  // always flushes current values without re-loading (which would steal focus).
+  const rollCallRowsRef = useRef(rollCallRows);
+  const operationsRowsRef = useRef(operationsRows);
+  useEffect(() => { rollCallRowsRef.current = rollCallRows; }, [rollCallRows]);
+  useEffect(() => { operationsRowsRef.current = operationsRows; }, [operationsRows]);
 
-  const handleRollCallChange = (driverId: string, field: keyof RollCallRow, value: string) => {
-    setRollCallRows((prev) =>
-      prev.map((row) => {
-        if (row.driver_id !== driverId) return row;
-        const updated = { ...row, [field]: value };
-        if (field === 'attendance_status' && value === 'No Show') updated.arrival_time = '';
-        return updated;
-      }),
-    );
-  };
+  const rcTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const opsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSaveRollCall = async () => {
+  const autosaveRollCall = async () => {
+    const rows = rollCallRowsRef.current;
+    if (rows.length === 0) return;
     setSaving(true);
     setSaveStatus('idle');
     const now = new Date().toISOString();
-    const records = rollCallRows.map((row) => ({
+    const records = rows.map((row) => ({
       report_date: row.report_date,
       station_id: row.station_id ?? null,
       driver_id: row.driver_id,
@@ -240,38 +248,27 @@ export function DailyReport() {
     const { error } = await supabase
       .from('daily_roll_call')
       .upsert(records, { onConflict: 'report_date,driver_id' });
-    if (error) {
-      console.error('Error saving roll call:', error);
-      setSaveStatus('error');
-    } else {
-      setSaveStatus('success');
-      await loadData(selectedDate);
-    }
     setSaving(false);
+    setSaveStatus(error ? 'error' : 'success');
+    if (error) console.error('Error autosaving roll call:', error);
+    // Attendance drives alerts (No Show / Late) — refresh them live.
+    else void loadAlerts(rows[0].report_date);
   };
 
-  // ── Operations handlers ────────────────────────────────────────────────────
-
-  const handleOperationsChange = (
-    driverId: string,
-    field: keyof OperationsRow,
-    value: string,
-  ) => {
-    setOperationsRows((prev) =>
-      prev.map((row) => (row.driver_id === driverId ? { ...row, [field]: value } : row)),
-    );
-  };
-
-  const handleSaveOperations = async () => {
+  const autosaveOperations = async () => {
+    const rows = operationsRowsRef.current;
+    if (rows.length === 0) return;
+    const date = rows[0].report_date;
     setOpsSaving(true);
     setOpsSaveStatus('idle');
     const now = new Date().toISOString();
-    const records = operationsRows.map((row) => ({
+    // route_number is owned by Roll Call — intentionally omitted so Operations
+    // never overwrites a route entered on the Roll Call tab.
+    const records = rows.map((row) => ({
       report_date: row.report_date,
       station_id: row.station_id ?? null,
       driver_id: row.driver_id,
       schedule_assignment_id: row.schedule_assignment_id ?? null,
-      route_number: row.route_number || null,
       stops_count: row.stops_count ? parseInt(row.stops_count, 10) : null,
       packages_count: row.packages_count ? parseInt(row.packages_count, 10) : null,
       route_status: row.route_status,
@@ -287,13 +284,70 @@ export function DailyReport() {
       .from('daily_roll_call')
       .upsert(records, { onConflict: 'report_date,driver_id' });
     if (error) {
-      console.error('Error saving operations:', error);
+      console.error('Error autosaving operations:', error);
       setOpsSaveStatus('error');
-    } else {
-      setOpsSaveStatus('success');
-      await loadData(selectedDate);
+      setOpsSaving(false);
+      return;
     }
+    setOpsSaveStatus('success');
     setOpsSaving(false);
+    // Route status / hours / delivery times drive alerts — refresh them live.
+    void loadAlerts(date);
+    // Refresh the DB-computed Total Hours without disturbing inputs still being
+    // edited (merge only rows for the same date + driver).
+    const { data } = await supabase
+      .from('daily_roll_call')
+      .select('driver_id, total_hours_worked')
+      .eq('report_date', date);
+    if (data) {
+      const byDriver = new Map(data.map((r: any) => [r.driver_id, r.total_hours_worked]));
+      setOperationsRows((prev) =>
+        prev.map((r) =>
+          r.report_date === date && byDriver.has(r.driver_id)
+            ? { ...r, total_hours_worked: byDriver.get(r.driver_id)?.toString() ?? '' }
+            : r,
+        ),
+      );
+    }
+  };
+
+  // Immediately flush any pending debounced save (on date change / unmount).
+  const flushPending = () => {
+    if (rcTimer.current) { clearTimeout(rcTimer.current); rcTimer.current = null; void autosaveRollCall(); }
+    if (opsTimer.current) { clearTimeout(opsTimer.current); opsTimer.current = null; void autosaveOperations(); }
+  };
+  useEffect(() => {
+    return () => { flushPending(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate]);
+
+  // ── Roll Call handlers ─────────────────────────────────────────────────────
+
+  const handleRollCallChange = (driverId: string, field: keyof RollCallRow, value: string) => {
+    setRollCallRows((prev) =>
+      prev.map((row) => {
+        if (row.driver_id !== driverId) return row;
+        const updated = { ...row, [field]: value };
+        if (field === 'attendance_status' && value === 'No Show') updated.arrival_time = '';
+        return updated;
+      }),
+    );
+    if (rcTimer.current) clearTimeout(rcTimer.current);
+    rcTimer.current = setTimeout(() => { void autosaveRollCall(); }, 600);
+  };
+
+  // ── Operations handlers ────────────────────────────────────────────────────
+
+  const handleOperationsChange = (
+    driverId: string,
+    field: keyof OperationsRow,
+    value: string,
+  ) => {
+    setOperationsRows((prev) =>
+      prev.map((row) => (row.driver_id === driverId ? { ...row, [field]: value } : row)),
+    );
+    if (opsTimer.current) clearTimeout(opsTimer.current);
+    opsTimer.current = setTimeout(() => { void autosaveOperations(); }, 600);
   };
 
   // ── Filtering ──────────────────────────────────────────────────────────────
@@ -434,7 +488,6 @@ export function DailyReport() {
           saving={saving}
           saveStatus={saveStatus}
           onRowChange={handleRollCallChange}
-          onSave={handleSaveRollCall}
         />
       )}
 
@@ -446,8 +499,11 @@ export function DailyReport() {
           saving={opsSaving}
           saveStatus={opsSaveStatus}
           onRowChange={handleOperationsChange}
-          onSave={handleSaveOperations}
         />
+      )}
+
+      {activeSubTab === 'Rescues' && (
+        <RescuesTab selectedDate={selectedDate} drivers={rollCallDrivers} stationId={activeStationId} />
       )}
 
       {activeSubTab === 'Issues' && (

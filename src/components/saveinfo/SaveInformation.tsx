@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import ReactDatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+import { DateRangePicker } from "../ui/date-range-picker";
 import { format, differenceInCalendarDays, parseISO } from "date-fns";
 import {
   Calendar,
@@ -96,9 +95,6 @@ const SECTIONS: SectionDef[] = [
 const SECTION_BY_ID = Object.fromEntries(
   SECTIONS.map((s) => [s.id, s]),
 ) as Record<ExportSection, SectionDef>;
-
-const fieldClass =
-  "w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-black/5 text-sm";
 
 // Strong ease-out — built-in CSS curves feel weak.
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
@@ -319,42 +315,18 @@ export function SaveInformation() {
 
         {/* Date range */}
         <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/30">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                From
-              </label>
-              <ReactDatePicker
-                selected={rangeStart}
-                onChange={(date: Date | null) => setRangeStart(date)}
-                selectsStart
-                startDate={rangeStart}
-                endDate={rangeEnd}
-                dateFormat="MM/dd/yyyy"
-                placeholderText="MM/DD/YYYY"
-                className={fieldClass}
-                wrapperClassName="w-full"
-                popperClassName="rdp-custom"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                To
-              </label>
-              <ReactDatePicker
-                selected={rangeEnd}
-                onChange={(date: Date | null) => setRangeEnd(date)}
-                selectsEnd
-                startDate={rangeStart}
-                endDate={rangeEnd}
-                minDate={rangeStart ?? undefined}
-                dateFormat="MM/dd/yyyy"
-                placeholderText="MM/DD/YYYY"
-                className={fieldClass}
-                wrapperClassName="w-full"
-                popperClassName="rdp-custom"
-              />
-            </div>
+          <div className="max-w-md space-y-1.5">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              Date Range
+            </label>
+            <DateRangePicker
+              value={{ from: rangeStart ?? undefined, to: rangeEnd ?? undefined }}
+              onChange={(r) => {
+                setRangeStart(r?.from ?? null);
+                setRangeEnd(r?.to ?? null);
+              }}
+              placeholder="MM/DD/YYYY – MM/DD/YYYY"
+            />
           </div>
           {startStr && endStr && !rangeValid && (
             <p className="text-[11px] font-semibold text-red-500 mt-2">

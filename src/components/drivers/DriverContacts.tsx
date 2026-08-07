@@ -334,6 +334,10 @@ export function DriverContacts() {
             onSave={() => {
               setIsModalOpen(false);
               fetchDrivers();
+              // Recompute the over-scheduled highlight right away. Realtime alone
+              // isn't enough: Postgres DELETE events only carry the row's PK, so
+              // RLS drops them and lowering a driver's days never clears the red.
+              fetchOverscheduled();
             }}
             onDelete={handleDeleteDriver}
             driver={editingDriver}

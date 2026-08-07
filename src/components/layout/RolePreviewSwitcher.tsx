@@ -20,7 +20,7 @@ export function RolePreviewSwitcher() {
   return (
     <div
       className={cn(
-        'fixed bottom-4 left-20 z-50 flex items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5 shadow-lg backdrop-blur transition-colors',
+        'fixed bottom-4 left-[calc(var(--sidebar-w,4rem)+1rem)] z-50 flex items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5 shadow-lg backdrop-blur transition-[left,colors] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]',
         active ? 'border-amber-300 bg-amber-50/95' : 'border-gray-200 bg-white/95'
       )}
     >

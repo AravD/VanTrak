@@ -41,3 +41,32 @@ export async function sendAppEmail(input: SendEmailInput): Promise<{ id: string 
   }
   return data as { id: string };
 }
+
+/**
+ * Wraps a message in VanTrak's branded HTML shell so every app email
+ * (invites, notifications, custom messages) looks consistent. `body` may
+ * contain HTML. Pass a `cta` to render the black action button.
+ */
+export function emailTemplate(opts: {
+  heading: string;
+  body: string;
+  cta?: { label: string; url: string };
+}): string {
+  const { heading, body, cta } = opts;
+  return `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f4f4f5;padding:32px 16px">
+    <div style="max-width:520px;margin:0 auto">
+      <div style="font-weight:800;font-size:22px;letter-spacing:-.03em;color:#111;margin-bottom:16px">VanTrak</div>
+      <div style="background:#ffffff;border:1px solid #eaeaea;border-radius:16px;padding:28px">
+        <h1 style="font-size:18px;line-height:1.3;margin:0 0 10px;color:#111">${heading}</h1>
+        <div style="font-size:14px;line-height:1.65;color:#444">${body}</div>
+        ${
+          cta
+            ? `<a href="${cta.url}" style="display:inline-block;margin-top:22px;background:#000;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:600;font-size:14px">${cta.label}</a>`
+            : ''
+        }
+      </div>
+      <p style="font-size:11px;color:#9ca3af;margin:16px 4px 0">Sent from VanTrak · If you didn't expect this email, you can ignore it.</p>
+    </div>
+  </div>`;
+}

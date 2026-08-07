@@ -1,41 +1,87 @@
-import { useState } from 'react';
-import { Sidebar } from '../components/layout/Sidebar';
-import { MasterSchedule } from '../components/schedule/MasterSchedule';
-import { DriverContacts } from '../components/drivers/DriverContacts';
-import { TimeOffExceptions } from '../components/timeoff/TimeOffExceptions';
-import { DailyReport } from '../components/dailyreport/DailyReport';
-import { SaveInformation } from '../components/saveinfo/SaveInformation';
-import { TeamManagement } from '../components/team/TeamManagement';
-import { RolePreviewSwitcher } from '../components/layout/RolePreviewSwitcher';
-import { useAuth } from './auth-context';
-import { motion, AnimatePresence } from 'motion/react';
+import { useState } from "react";
+import {
+  Sidebar,
+  SIDEBAR_ORDER,
+  SIDEBAR_WIDTH,
+  type SidebarState,
+} from "../components/layout/Sidebar";
+import { HomeDashboard } from "../components/home/HomeDashboard";
+import { MasterSchedule } from "../components/schedule/MasterSchedule";
+import { DriverContacts } from "../components/drivers/DriverContacts";
+import { TimeOffExceptions } from "../components/timeoff/TimeOffExceptions";
+import { DailyReport } from "../components/dailyreport/DailyReport";
+import { SaveInformation } from "../components/saveinfo/SaveInformation";
+import { TeamManagement } from "../components/team/TeamManagement";
+import { MyAccount } from "../components/account/MyAccount";
+import { RolePreviewSwitcher } from "../components/layout/RolePreviewSwitcher";
+import { useAuth } from "./auth-context";
+import { motion, AnimatePresence } from "motion/react";
+import { MorphPanel } from "../components/ui/ai-input";
 
-type Page = 'schedule' | 'contacts' | 'timeoff' | 'dailyreport' | 'saveinfo' | 'team';
+type Page =
+  | "home"
+  | "schedule"
+  | "contacts"
+  | "timeoff"
+  | "dailyreport"
+  | "saveinfo"
+  | "team"
+  | "account";
 
 export function AppShell() {
   const { signOut, hasPermission } = useAuth();
 
-  const [activePage, setActivePage] = useState<Page>(
-    () => (localStorage.getItem('activePage') as Page) || 'schedule'
-  );
+  const [activePage, setActivePage] = useState<Page>(() => {
+    const lastPage = (localStorage.getItem("activePage") as Page) || "home";
+    // A page reload keeps you where you were; only a fresh launch / sign-in
+    // honors the "Default landing page" preference (defaults to Home).
+    // sessionStorage survives reloads within a tab but is empty on a new sign-in.
+    if (sessionStorage.getItem("vt_session_started")) return lastPage;
+    sessionStorage.setItem("vt_session_started", "1");
+    const landing = localStorage.getItem("vt_landing") || "home";
+    return landing === "last" ? lastPage : (landing as Page);
+  });
+
+  const [sidebarState, setSidebarState] = useState<SidebarState>(() => {
+    const saved = localStorage.getItem("sidebarState");
+    return saved === "icon" || saved === "compact" ? saved : "compact";
+  });
 
   const handlePageChange = (page: Page) => {
-    localStorage.setItem('activePage', page);
+    localStorage.setItem("activePage", page);
     setActivePage(page);
   };
 
+  const cycleSidebar = () => {
+    setSidebarState((prev) => {
+      const next =
+        SIDEBAR_ORDER[(SIDEBAR_ORDER.indexOf(prev) + 1) % SIDEBAR_ORDER.length];
+      localStorage.setItem("sidebarState", next);
+      return next;
+    });
+  };
+
   return (
-    <div className="flex min-h-screen bg-[#FAFAFA] font-sans selection:bg-black selection:text-white">
+    <div
+      className="flex min-h-screen bg-[#FAFAFA] font-sans selection:bg-black selection:text-white"
+      style={{ ["--sidebar-w" as string]: SIDEBAR_WIDTH[sidebarState] }}
+    >
       <Sidebar
         activePage={activePage}
         onPageChange={handlePageChange}
-        onLogoClick={() => handlePageChange('schedule')}
+        onLogoClick={() => handlePageChange("home")}
         onSignOut={signOut}
+        state={sidebarState}
+        onCycleState={cycleSidebar}
       />
 
       <RolePreviewSwitcher />
+      <MorphPanel />
 
-      <main className="flex-1 ml-16 overflow-auto">
+      <main
+        className="flex-1 overflow-auto transition-[margin] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
+        style={{ marginLeft: "var(--sidebar-w)" }}
+      >
         <AnimatePresence mode="wait">
           <motion.div
             key={activePage}
@@ -44,23 +90,30 @@ export function AppShell() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            {activePage === 'schedule' ? (
+            {activePage === "home" ? (
+              <HomeDashboard onNavigate={handlePageChange} />
+            ) : activePage === "schedule" ? (
               <MasterSchedule />
-            ) : activePage === 'contacts' ? (
+            ) : activePage === "contacts" ? (
               <DriverContacts />
-            ) : activePage === 'timeoff' ? (
+            ) : activePage === "timeoff" ? (
               <TimeOffExceptions />
-            ) : activePage === 'dailyreport' ? (
+            ) : activePage === "dailyreport" ? (
               <DailyReport />
-            ) : activePage === 'team' ? (
+            ) : activePage === "team" ? (
               <TeamManagement />
-            ) : hasPermission('reports.export') ? (
+            ) : activePage === "account" ? (
+              <MyAccount />
+            ) : hasPermission("reports.export") ? (
               <SaveInformation />
             ) : (
               <div className="mx-auto mt-24 max-w-sm px-8 text-center">
-                <h2 className="text-base font-semibold text-black">You don't have access</h2>
+                <h2 className="text-base font-semibold text-black">
+                  You don't have access
+                </h2>
                 <p className="mt-1 text-sm text-gray-500">
-                  Viewing and exporting saved information requires the Export permission.
+                  Viewing and exporting saved information requires the Export
+                  permission.
                 </p>
               </div>
             )}

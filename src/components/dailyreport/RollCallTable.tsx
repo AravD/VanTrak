@@ -1,9 +1,8 @@
-import React from 'react';
-import { Check, AlertCircle } from 'lucide-react';
-import { cn, normalizeTimeInput } from '../../lib/utils';
+import { cn } from '../../lib/utils';
 import { RollCallRow, RollCallDriver } from '../../types/driver';
 import { TableSkeleton } from './TableSkeleton';
 import { TableEmpty } from './TableEmpty';
+import { cellInput, DriverAvatar, StatusSelect, TimeInput, AutosaveStatus, type Tone } from './ui';
 
 function getRoleOptions(notes: string | null): string[] {
   const n = (notes || '').toLowerCase();
@@ -14,23 +13,11 @@ function getRoleOptions(notes: string | null): string[] {
   return options;
 }
 
-function dvicColor(value: string) {
-  if (value === 'Completed') return 'border-green-200 bg-green-50 text-green-800';
-  if (value === 'Issue Reported') return 'border-yellow-200 bg-yellow-50 text-yellow-800';
-  return 'border-red-200 bg-red-50 text-red-800'; // Not Completed
-}
-
-function roleColor(value: string) {
-  if (value === 'Rescue') return 'border-blue-200 bg-blue-50 text-blue-800';
-  return 'border-gray-100 bg-gray-50/50 text-gray-700';
-}
-
-function attendanceColor(value: string) {
-  if (value === 'On Time') return 'border-green-200 bg-green-50 text-green-800';
-  if (value === 'Late') return 'border-yellow-200 bg-yellow-50 text-yellow-800';
-  if (value === 'No Show') return 'border-red-200 bg-red-50 text-red-800';
-  return 'border-gray-100 bg-gray-50/50 text-gray-500'; // empty/unset
-}
+const dvicTone = (v: string): Tone =>
+  v === 'Completed' ? 'green' : v === 'Issue Reported' ? 'amber' : 'rose';
+const attendanceTone = (v: string): Tone =>
+  v === 'On Time' ? 'green' : v === 'Late' ? 'amber' : v === 'No Show' ? 'rose' : 'neutral';
+const roleTone = (v: string): Tone => (v === 'Rescue' ? 'blue' : 'neutral');
 
 interface RollCallTableProps {
   rows: RollCallRow[];
@@ -39,7 +26,6 @@ interface RollCallTableProps {
   saving: boolean;
   saveStatus: 'idle' | 'success' | 'error';
   onRowChange: (driverId: string, field: keyof RollCallRow, value: string) => void;
-  onSave: () => void;
 }
 
 export function RollCallTable({
@@ -49,7 +35,6 @@ export function RollCallTable({
   saving,
   saveStatus,
   onRowChange,
-  onSave,
 }: RollCallTableProps) {
   if (loading) {
     return <TableSkeleton columns={8} />;
@@ -61,32 +46,23 @@ export function RollCallTable({
     );
   }
 
-  // Allow free typing while focused; expand shorthand to HH:MM on blur.
-  const handleTimeChange = (driverId: string, raw: string) =>
-    onRowChange(driverId, 'arrival_time', raw.replace(/[^\d:]/g, '').slice(0, 5));
-  const handleTimeBlur = (driverId: string, raw: string) =>
-    onRowChange(driverId, 'arrival_time', normalizeTimeInput(raw));
-
-  const inputClass =
-    'w-full px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-black/5 text-sm';
-  const selectBase =
-    'w-full px-3 py-1.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-black/5 text-sm font-medium';
+  const th = 'px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400';
 
   return (
     <div>
-      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[960px]">
+          <table className="w-full min-w-[1080px] border-collapse text-left">
             <thead>
-              <tr className="bg-gray-50/50 text-[11px] uppercase tracking-widest font-bold text-gray-500 border-b border-gray-100">
-                <th className="px-4 py-3">Driver</th>
-                <th className="px-4 py-3">Route</th>
-                <th className="px-4 py-3">Role</th>
-                <th className="px-4 py-3">Attendance</th>
-                <th className="px-4 py-3">Arrival Time</th>
-                <th className="px-4 py-3">DVIC Status</th>
-                <th className="px-4 py-3">Van</th>
-                <th className="px-4 py-3">Phone</th>
+              <tr className="border-b border-gray-100 bg-gray-50/60">
+                <th className={cn(th, 'pl-6')}>Driver</th>
+                <th className={th}>Route</th>
+                <th className={th}>Role</th>
+                <th className={th}>Attendance</th>
+                <th className={th}>Arrival</th>
+                <th className={th}>DVIC Status</th>
+                <th className={th}>Van</th>
+                <th className={th}>Phone</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -96,89 +72,82 @@ export function RollCallTable({
                 const isNoShow = row.attendance_status === 'No Show';
 
                 return (
-                  <tr key={row.driver_id} className="hover:bg-gray-50/30 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-black text-sm whitespace-nowrap">
-                        {driver ? `${driver.first_name} ${driver.last_name}` : '—'}
+                  <tr
+                    key={row.driver_id}
+                    className="transition-colors duration-150 hover:bg-gray-50/50"
+                  >
+                    <td className="py-3 pl-6 pr-5">
+                      <div className="flex items-center gap-3">
+                        <DriverAvatar first={driver?.first_name} last={driver?.last_name} />
+                        <span className="whitespace-nowrap text-sm font-semibold text-gray-900">
+                          {driver ? `${driver.first_name} ${driver.last_name}` : '—'}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+
+                    <td className="px-5 py-2.5">
                       <input
                         type="text"
                         value={row.route_number}
                         onChange={(e) => onRowChange(row.driver_id, 'route_number', e.target.value)}
-                        className={cn(inputClass, 'w-24')}
+                        className={cn(cellInput, 'w-24 text-center tabular-nums')}
                       />
                     </td>
-                    <td className="px-4 py-3">
-                      <select
+
+                    <td className="px-5 py-2.5">
+                      <StatusSelect
                         value={row.role}
-                        onChange={(e) => onRowChange(row.driver_id, 'role', e.target.value)}
-                        className={cn(selectBase, 'w-32', roleColor(row.role))}
-                      >
-                        {roleOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={row.attendance_status}
-                        onChange={(e) =>
-                          onRowChange(row.driver_id, 'attendance_status', e.target.value)
-                        }
-                        className={cn(selectBase, 'w-32', attendanceColor(row.attendance_status))}
-                      >
-                        <option value=""></option>
-                        <option>On Time</option>
-                        <option>Late</option>
-                        <option>No Show</option>
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={row.arrival_time}
-                        onChange={(e) => handleTimeChange(row.driver_id, e.target.value)}
-                        onBlur={(e) => handleTimeBlur(row.driver_id, e.target.value)}
-                        disabled={isNoShow}
-                        className={cn(
-                          inputClass,
-                          'w-28',
-                          isNoShow && 'opacity-30 cursor-not-allowed',
-                        )}
+                        options={roleOptions}
+                        tone={roleTone(row.role)}
+                        onChange={(v) => onRowChange(row.driver_id, 'role', v)}
+                        className="w-36"
                       />
                     </td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={row.dvic_status}
-                        onChange={(e) => onRowChange(row.driver_id, 'dvic_status', e.target.value)}
-                        className={cn(selectBase, 'w-40', dvicColor(row.dvic_status))}
-                      >
-                        <option>Not Completed</option>
-                        <option>Completed</option>
-                        <option>Issue Reported</option>
-                      </select>
+
+                    <td className="px-5 py-2.5">
+                      <StatusSelect
+                        value={row.attendance_status}
+                        options={['', 'On Time', 'Late', 'No Show']}
+                        tone={attendanceTone(row.attendance_status)}
+                        onChange={(v) => onRowChange(row.driver_id, 'attendance_status', v)}
+                        className="w-40"
+                      />
                     </td>
-                    <td className="px-4 py-3">
+
+                    <td className="px-5 py-2.5">
+                      <TimeInput
+                        value={row.arrival_time}
+                        onChange={(v) => onRowChange(row.driver_id, 'arrival_time', v)}
+                        disabled={isNoShow}
+                        className="w-32"
+                      />
+                    </td>
+
+                    <td className="px-5 py-2.5">
+                      <StatusSelect
+                        value={row.dvic_status}
+                        options={['Not Completed', 'Completed', 'Issue Reported']}
+                        tone={dvicTone(row.dvic_status)}
+                        onChange={(v) => onRowChange(row.driver_id, 'dvic_status', v)}
+                        className="w-48"
+                      />
+                    </td>
+
+                    <td className="px-5 py-2.5">
                       <input
                         type="text"
                         value={row.van_number}
                         onChange={(e) => onRowChange(row.driver_id, 'van_number', e.target.value)}
-                        className={cn(inputClass, 'w-20')}
+                        className={cn(cellInput, 'w-20 text-center tabular-nums')}
                       />
                     </td>
-                    <td className="px-4 py-3">
+
+                    <td className="px-5 py-2.5">
                       <input
                         type="text"
                         value={row.phone_assignment}
-                        onChange={(e) =>
-                          onRowChange(row.driver_id, 'phone_assignment', e.target.value)
-                        }
-                        className={cn(inputClass, 'w-24')}
+                        onChange={(e) => onRowChange(row.driver_id, 'phone_assignment', e.target.value)}
+                        className={cn(cellInput, 'w-28 text-center tabular-nums')}
                       />
                     </td>
                   </tr>
@@ -189,30 +158,7 @@ export function RollCallTable({
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-4 mt-4">
-        {saveStatus === 'success' && (
-          <div className="flex items-center gap-1.5 text-green-600 text-sm font-medium">
-            <Check size={15} />
-            Saved successfully
-          </div>
-        )}
-        {saveStatus === 'error' && (
-          <div className="flex items-center gap-1.5 text-red-500 text-sm font-medium">
-            <AlertCircle size={15} />
-            Failed to save
-          </div>
-        )}
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className={cn(
-            'px-6 py-2.5 rounded-xl bg-black text-white font-bold text-sm transition-all shadow-lg shadow-gray-200',
-            saving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800',
-          )}
-        >
-          {saving ? 'Saving...' : 'Save Roll Call'}
-        </button>
-      </div>
+      <AutosaveStatus saving={saving} saveStatus={saveStatus} />
     </div>
   );
 }

@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-  Mail, Copy, Check, Trash2, UserCheck, ShieldAlert, Plus, Pencil, X, LogOut,
+  Mail, Copy, Check, Trash2, UserCheck, ShieldAlert, Plus, Pencil, X,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { sendAppEmail } from '../../lib/email';
+import { sendAppEmail, emailTemplate } from '../../lib/email';
 import { useAuth } from '../../app/auth-context';
 import { PERMISSION_SECTIONS, ROLE_TEMPLATES, permissionGranted } from '../../lib/permissions';
 import { PageHeader } from '../common/PageHeader';
-import { formatPhone } from '../../lib/phone';
 import { cn } from '../../lib/utils';
 
 interface MemberRow {
@@ -42,7 +41,7 @@ const FIELD =
 const FIELD_LABEL = 'text-[10px] font-bold uppercase tracking-widest text-gray-400';
 
 export function TeamManagement() {
-  const { membership, session, hasPermission, signOut } = useAuth();
+  const { membership, session, hasPermission } = useAuth();
   const businessId = membership?.businessId ?? null;
   const myUserId = session?.user.id;
 
@@ -60,7 +59,8 @@ export function TeamManagement() {
 
   const [modal, setModal] = useState<ModalState | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [editingDetails, setEditingDetails] = useState(false);
+  const [removing, setRemoving] = useState<MemberRow | null>(null);
+  const [removingBusy, setRemovingBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!businessId) {
@@ -144,9 +144,11 @@ export function TeamManagement() {
           await sendAppEmail({
             to: clean,
             subject: `You're invited to join ${businessName} on VanTrak`,
-            html: `<p>You've been invited to join <strong>${businessName}</strong> as <strong>${roleName}</strong>.</p>
-                   <p><a href="${link}">Accept your invite</a></p>
-                   <p>Or paste this link into your browser:<br>${link}</p>`,
+            html: emailTemplate({
+              heading: `You're invited to ${businessName}`,
+              body: `You've been invited to join <strong>${businessName}</strong> as <strong>${roleName}</strong> on VanTrak. Click below to accept and set up your account.<br><br>Or paste this link into your browser:<br><span style="color:#6b7280;font-size:12px;word-break:break-all">${link}</span>`,
+              cta: { label: 'Accept invite', url: link },
+            }),
           });
           setNotice({ kind: 'ok', text: `Invite emailed to ${clean}.` });
         } catch (mailErr) {
@@ -176,46 +178,42 @@ export function TeamManagement() {
     await supabase.from('business_members').update({ status: 'approved' }).eq('id', id);
     load();
   };
-  const removeMember = async (id: string) => {
-    await supabase.from('business_members').delete().eq('id', id);
-    load();
+  const removeMember = async (m: MemberRow) => {
+    setRemovingBusy(true);
+    // `.select()` so we can tell a real removal from an RLS no-op (0 rows).
+    const { data, error } = await supabase
+      .from('business_members')
+      .delete()
+      .eq('id', m.id)
+      .select('id');
+    setRemovingBusy(false);
+    if (error) {
+      setNotice({ kind: 'err', text: error.message });
+      return;
+    }
+    if (!data || data.length === 0) {
+      setNotice({ kind: 'err', text: "Couldn't remove this member — you may not have permission." });
+      return;
+    }
+    setRemoving(null);
+    setNotice({ kind: 'ok', text: `${m.fullName || m.email || 'Member'} was removed from the team.` });
+    await load();
   };
   const revokeInvite = async (id: string) => {
-    await supabase.rpc('revoke_invite', { p_id: id });
+    // Emails can't be recalled, but revoking invalidates the invite token so the
+    // link in that email stops working (the recipient sees "Invite unavailable").
+    const { error } = await supabase.rpc('revoke_invite', { p_id: id });
+    if (error) {
+      setNotice({ kind: 'err', text: error.message });
+      return;
+    }
+    setNotice({ kind: 'ok', text: 'Invite deleted — its link no longer works.' });
     load();
   };
   const copyLink = (token: string) => {
     navigator.clipboard?.writeText(`${window.location.origin}/invite/${token}`);
     setCopied(token);
     setTimeout(() => setCopied((c) => (c === token ? null : c)), 1500);
-  };
-
-  // Save the current user's own details. Name + phone are immediate (profiles);
-  // an email change starts Supabase's confirm-by-link flow (returns emailChanged).
-  const saveDetails = async (first: string, last: string, phone: string, email: string) => {
-    const uid = session?.user.id;
-    if (!uid) throw new Error('Not signed in.');
-    const fullName = `${first.trim()} ${last.trim()}`.trim();
-    const nextEmail = email.trim();
-    const emailChanged =
-      nextEmail.length > 0 && nextEmail.toLowerCase() !== (session?.user.email ?? '').toLowerCase();
-
-    const { error: pErr } = await supabase
-      .from('profiles')
-      .update({
-        full_name: fullName || null,
-        phone: phone.trim() || null,
-        ...(emailChanged ? { email: nextEmail } : {}),
-      })
-      .eq('id', uid);
-    if (pErr) throw pErr;
-
-    if (emailChanged) {
-      const { error: eErr } = await supabase.auth.updateUser({ email: nextEmail });
-      if (eErr) throw eErr;
-    }
-    await load();
-    return { emailChanged };
   };
 
   if (!businessId) {
@@ -233,13 +231,9 @@ export function TeamManagement() {
     );
   }
 
-  const me = members.find((m) => m.userId === myUserId);
-  const myName = me?.fullName || session?.user.email || 'You';
-  const myEmail = me?.email ?? session?.user.email ?? '—';
-
   return (
     <div className="p-8 max-w-[1600px] mx-auto">
-      <PageHeader title="User Management">
+      <PageHeader title="Team">
         {canInvite && (
           <button type="button" onClick={() => setModal({ mode: 'invite' })} className={PRIMARY_BTN}>
             <Plus size={20} />
@@ -254,40 +248,8 @@ export function TeamManagement() {
         </p>
       )}
 
-      {/* ── Current user card ───────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 mb-8 flex items-center gap-5">
-        <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-black text-lg font-bold text-white">
-          {initials(myName)}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-lg font-bold text-black truncate">
-            {myName} <span className="text-xs font-medium text-gray-400">(you)</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm font-medium text-gray-500 mt-0.5">
-            <Mail size={13} className="opacity-50" /> {myEmail}
-          </div>
-          <div className="mt-2">
-            <button
-              type="button"
-              onClick={() => setEditingDetails(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50 hover:text-black active:scale-[0.98]"
-            >
-              <Pencil size={14} />
-              Edit details
-            </button>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={signOut}
-          className="flex shrink-0 items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-200 font-semibold text-gray-600 transition-all hover:bg-gray-50 hover:text-black active:scale-[0.98]"
-        >
-          <LogOut size={18} />
-          Sign out
-        </button>
-      </div>
-
-      {/* ── Team users table ────────────────────────────────────────────── */}
+      {/* ── Team members ────────────────────────────────────────────────── */}
+      <h2 className="mb-3 text-[11px] font-bold uppercase tracking-widest text-gray-400">Members</h2>
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -334,7 +296,7 @@ export function TeamManagement() {
                         </IconBtn>
                       )}
                       {canRemove && !isSelf && !isOwner && (
-                        <IconBtn onClick={() => removeMember(m.id)} title="Remove user" danger>
+                        <IconBtn onClick={() => setRemoving(m)} title="Remove member" danger>
                           <Trash2 size={16} />
                         </IconBtn>
                       )}
@@ -343,47 +305,82 @@ export function TeamManagement() {
                 </tr>
               );
             })}
-
-            {invites.map((inv) => (
-              <tr key={inv.id} className="bg-gray-50/30 hover:bg-gray-50/50 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-400">
-                      <Mail size={15} />
-                    </span>
-                    <span className="font-bold text-black">{inv.email}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-xs font-medium text-gray-400">Awaiting sign-up</td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-600">{inv.roleName ?? '—'}</td>
-                <td className="px-6 py-4"><StatusPill status="Invited" /></td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center justify-end gap-1">
-                    <button
-                      type="button"
-                      onClick={() => copyLink(inv.token)}
-                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-black active:scale-[0.97]"
-                    >
-                      {copied === inv.token ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
-                      {copied === inv.token ? 'Copied' : 'Link'}
-                    </button>
-                    {canInvite && (
-                      <IconBtn onClick={() => revokeInvite(inv.id)} title="Revoke invite" danger>
-                        <Trash2 size={16} />
-                      </IconBtn>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
           </tbody>
         </table>
 
-        {!loading && members.length + invites.length === 0 && (
-          <div className="py-20 text-center text-gray-400 italic">No users yet.</div>
+        {!loading && members.length === 0 && (
+          <div className="py-20 text-center text-gray-400 italic">No members yet.</div>
         )}
         {loading && <div className="py-20 text-center text-gray-400 italic">Loading…</div>}
       </div>
+
+      {/* ── Pending invites ─────────────────────────────────────────────── */}
+      {canInvite && (
+        <div className="mt-8">
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Pending Invites</h2>
+            {invites.length > 0 && (
+              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">
+                {invites.length}
+              </span>
+            )}
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+            {invites.length === 0 ? (
+              <div className="flex flex-col items-center gap-1 py-14 text-center">
+                <Mail className="mb-1 text-gray-300" size={22} />
+                <p className="text-sm font-medium text-gray-500">No pending invites</p>
+                <p className="text-xs text-gray-400">
+                  Invites you send appear here until they're accepted.
+                </p>
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/50 text-[11px] uppercase tracking-widest font-bold text-gray-500 border-b border-gray-100">
+                    <th className="px-6 py-4">Email</th>
+                    <th className="px-6 py-4">Role</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {invites.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-gray-50/30 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-400">
+                            <Mail size={15} />
+                          </span>
+                          <span className="font-bold text-black">{inv.email}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-600">{inv.roleName ?? '—'}</td>
+                      <td className="px-6 py-4"><StatusPill status="Pending" /></td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => copyLink(inv.token)}
+                            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-black active:scale-[0.97]"
+                          >
+                            {copied === inv.token ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+                            {copied === inv.token ? 'Copied' : 'Link'}
+                          </button>
+                          <IconBtn onClick={() => revokeInvite(inv.id)} title="Delete invite" danger>
+                            <Trash2 size={16} />
+                          </IconBtn>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
 
       {modal && (
         <UserModal
@@ -396,15 +393,69 @@ export function TeamManagement() {
         />
       )}
 
-      {editingDetails && (
-        <EditDetailsModal
-          fullName={me?.fullName ?? ''}
-          email={myEmail === '—' ? '' : myEmail}
-          phone={me?.phone ?? ''}
-          onSave={saveDetails}
-          onClose={() => setEditingDetails(false)}
+      {removing && (
+        <ConfirmRemoveModal
+          member={removing}
+          businessName={businessName}
+          busy={removingBusy}
+          onConfirm={() => removeMember(removing)}
+          onClose={() => setRemoving(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ── Confirm removing a member ─────────────────────────────────────────────────
+function ConfirmRemoveModal({
+  member, businessName, busy, onConfirm, onClose,
+}: {
+  member: MemberRow;
+  businessName: string;
+  busy: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const who = member.fullName || member.email || 'This member';
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={onClose} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+        className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white p-8 shadow-2xl"
+      >
+        <span className="mb-4 flex size-12 items-center justify-center rounded-full bg-red-50 text-red-500">
+          <Trash2 size={22} />
+        </span>
+        <h2 className="text-xl font-bold tracking-tight">Remove member?</h2>
+        <p className="mt-2 text-sm leading-relaxed text-gray-500">
+          <span className="font-semibold text-black">{who}</span> will lose access to{' '}
+          <span className="font-semibold text-black">{businessName || 'this business'}</span> immediately.
+          Their account isn&apos;t deleted, and you can re-invite them later.
+        </p>
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-6 py-3 rounded-xl border border-gray-100 font-bold text-gray-500 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className={cn(
+              'flex-1 px-6 py-3 rounded-xl bg-red-500 text-white font-bold transition-all shadow-lg shadow-red-100',
+              busy ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-600',
+            )}
+          >
+            {busy ? 'Removing…' : 'Remove'}
+          </button>
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -511,119 +562,6 @@ function UserModal({
             {submitting ? 'Saving…' : mode === 'invite' ? 'Send Invite' : 'Save Changes'}
           </button>
         </div>
-      </motion.div>
-    </div>
-  );
-}
-
-// ── Edit-your-own-details modal ──────────────────────────────────────────────
-function EditDetailsModal({
-  fullName, email, phone, onSave, onClose,
-}: {
-  fullName: string;
-  email: string;
-  phone: string;
-  onSave: (first: string, last: string, phone: string, email: string) => Promise<{ emailChanged: boolean }>;
-  onClose: () => void;
-}) {
-  const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
-  const [firstName, setFirstName] = useState(nameParts[0] ?? '');
-  const [lastName, setLastName] = useState(nameParts.slice(1).join(' '));
-  const [phoneVal, setPhoneVal] = useState(phone);
-  const [emailVal, setEmailVal] = useState(email);
-  const [submitting, setSubmitting] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [confirmMsg, setConfirmMsg] = useState<string | null>(null);
-
-  const submit = async () => {
-    setErr(null);
-    setSubmitting(true);
-    try {
-      const { emailChanged } = await onSave(firstName, lastName, phoneVal, emailVal);
-      if (emailChanged) {
-        setConfirmMsg(
-          `Saved. We sent a confirmation link to ${emailVal.trim()} — your sign-in email changes once you click it.`,
-        );
-      } else {
-        onClose();
-      }
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Could not save your details.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={onClose} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
-        className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
-      >
-        <div className="flex items-center justify-between px-8 pt-8 pb-5">
-          <h2 className="text-2xl font-bold tracking-tight">Edit details</h2>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-black">
-            <X size={20} />
-          </button>
-        </div>
-
-        {confirmMsg ? (
-          <div className="px-8 pb-8">
-            <p className="rounded-xl bg-green-50 border border-green-100 px-4 py-3 text-sm font-medium text-green-700">{confirmMsg}</p>
-            <button type="button" onClick={onClose} className={cn(PRIMARY_BTN, 'mt-5 w-full justify-center')}>Done</button>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-4 px-8 pb-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className={FIELD_LABEL}>First Name</label>
-                  <input value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus className={FIELD} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className={FIELD_LABEL}>Last Name</label>
-                  <input value={lastName} onChange={(e) => setLastName(e.target.value)} className={FIELD} />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className={FIELD_LABEL}>Phone Number</label>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={12}
-                  value={phoneVal}
-                  onChange={(e) => setPhoneVal(formatPhone(e.target.value))}
-                  className={FIELD}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className={FIELD_LABEL}>Email Address</label>
-                <input type="email" value={emailVal} onChange={(e) => setEmailVal(e.target.value)} className={FIELD} />
-                <p className="text-[11px] text-gray-400">
-                  Changing your email sends a confirmation link — it takes effect once you click it.
-                </p>
-              </div>
-              {err && <p className="text-xs font-medium text-red-600">{err}</p>}
-            </div>
-
-            <div className="flex gap-3 px-8 py-6">
-              <button type="button" onClick={onClose} className="flex-1 px-6 py-3 rounded-xl border border-gray-100 font-bold text-gray-500 hover:bg-gray-50 transition-colors">
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={submit}
-                disabled={submitting}
-                className={cn('flex-1 px-6 py-3 rounded-xl bg-black text-white font-bold transition-all shadow-lg shadow-gray-200', submitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800')}
-              >
-                {submitting ? 'Saving…' : 'Save Changes'}
-              </button>
-            </div>
-          </>
-        )}
       </motion.div>
     </div>
   );

@@ -1,0 +1,15 @@
+# Project metadata + tool config. (We install dependencies from requirements.txt;
+# this file configures the tooling — tests, linting — and describes the project.)
+
+[project]
+name = "vantrak-agent-api"
+version = "0.1.0"
+description = "FastAPI service + AI operations agent layered on top of Supabase."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]        # so tests can `import app.main`
+testpaths = ["app/tests"]
+
+[tool.ruff]
+line-length = 100

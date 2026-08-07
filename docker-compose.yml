@@ -1,0 +1,17 @@
+# Local dev orchestration for the backend service(s).
+# Run from the repo root:  docker compose up --build
+#
+# (The web app runs separately with `npm run dev` for now; it moves into this
+#  compose file when we containerize the frontend.)
+
+services:
+  agent-api:
+    build: ./services/agent-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./services/agent-api/.env.api
+    # Live-reload in dev: mount the code and let uvicorn watch it.
+    volumes:
+      - ./services/agent-api/app:/app/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

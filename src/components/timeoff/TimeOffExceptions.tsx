@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import ReactDatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+import { DateRangePicker } from "../ui/date-range-picker";
 import {
   format,
   parseISO,
@@ -501,6 +500,9 @@ function ExceptionModal({
       makeup_start_date: formData.makeup_required ? makeupStart || null : null,
       makeup_end_date: formData.makeup_required ? makeupEnd || null : null,
       notes: formData.notes || null,
+      // No makeup shift to review → approve & apply immediately (skip Pending).
+      // With makeup required, leave status alone so it stays Pending for review.
+      ...(formData.makeup_required ? {} : { status: "Applied" as const }),
     };
 
     try {
@@ -629,39 +631,24 @@ function ExceptionModal({
             </select>
           </div>
 
-          {/* Start Date */}
-          <div className="space-y-1.5">
+          {/* Time-off dates */}
+          <div className="col-span-2 space-y-1.5">
             <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-              Start Date
+              Dates
             </label>
-            <ReactDatePicker
-              selected={toDate(formData.start_date)}
-              onChange={(date: Date | null) =>
-                setFormData({ ...formData, start_date: toStr(date) })
+            <DateRangePicker
+              value={{
+                from: toDate(formData.start_date ?? null) ?? undefined,
+                to: toDate(formData.end_date ?? null) ?? undefined,
+              }}
+              onChange={(r) =>
+                setFormData({
+                  ...formData,
+                  start_date: toStr(r?.from ?? null),
+                  end_date: toStr(r?.to ?? null),
+                })
               }
-              dateFormat="MM/dd/yyyy"
-              placeholderText="MM/DD/YYYY"
-              className={field}
-              wrapperClassName="w-full"
-              popperClassName="rdp-custom"
-            />
-          </div>
-
-          {/* End Date */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-              End Date
-            </label>
-            <ReactDatePicker
-              selected={toDate(formData.end_date)}
-              onChange={(date: Date | null) =>
-                setFormData({ ...formData, end_date: toStr(date) })
-              }
-              dateFormat="MM/dd/yyyy"
-              placeholderText="MM/DD/YYYY"
-              className={field}
-              wrapperClassName="w-full"
-              popperClassName="rdp-custom"
+              placeholder="MM/DD/YYYY – MM/DD/YYYY"
             />
           </div>
 
@@ -716,39 +703,21 @@ function ExceptionModal({
                 transition={{ duration: 0.2, ease: "easeInOut" }}
                 className="col-span-2 overflow-hidden"
               >
-                <div className="grid grid-cols-2 gap-4 pt-1">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                      Makeup Start Date
-                    </label>
-                    <ReactDatePicker
-                      selected={toDate(makeupStart)}
-                      onChange={(date: Date | null) =>
-                        setMakeupStart(toStr(date))
-                      }
-                      dateFormat="MM/dd/yyyy"
-                      placeholderText="MM/DD/YYYY"
-                      className={field}
-                      wrapperClassName="w-full"
-                      popperClassName="rdp-custom"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                      Makeup End Date
-                    </label>
-                    <ReactDatePicker
-                      selected={toDate(makeupEnd)}
-                      onChange={(date: Date | null) =>
-                        setMakeupEnd(toStr(date))
-                      }
-                      dateFormat="MM/dd/yyyy"
-                      placeholderText="MM/DD/YYYY"
-                      className={field}
-                      wrapperClassName="w-full"
-                      popperClassName="rdp-custom"
-                    />
-                  </div>
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                    Makeup Dates
+                  </label>
+                  <DateRangePicker
+                    value={{
+                      from: toDate(makeupStart) ?? undefined,
+                      to: toDate(makeupEnd) ?? undefined,
+                    }}
+                    onChange={(r) => {
+                      setMakeupStart(toStr(r?.from ?? null));
+                      setMakeupEnd(toStr(r?.to ?? null));
+                    }}
+                    placeholder="MM/DD/YYYY – MM/DD/YYYY"
+                  />
                 </div>
               </motion.div>
             )}

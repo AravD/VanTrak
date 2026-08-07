@@ -1,0 +1,20 @@
+# Web framework + the server that runs it
+fastapi
+uvicorn[standard]
+
+# Reads settings from environment variables / .env
+pydantic-settings
+
+# Verifies the Supabase access token (a JWT).
+# [crypto] pulls in `cryptography`, needed to verify asymmetric ES256 tokens.
+pyjwt[crypto]
+
+# Official Supabase client for Python (same idea as supabase-js on the frontend)
+supabase
+
+# Trusted root certificates, used to verify HTTPS when fetching Supabase's JWKS.
+certifi
+
+# Testing
+pytest
+httpx          # FastAPI's TestClient uses this to make requests in tests

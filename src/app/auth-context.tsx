@@ -115,6 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     localStorage.removeItem(GUEST_KEY);
+    // Reset the launch marker so the next sign-in lands on the home page again.
+    sessionStorage.removeItem('vt_session_started');
     setIsGuest(false);
     setMembership(null);
     await supabase.auth.signOut();

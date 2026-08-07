@@ -15,6 +15,9 @@ supabase
 # Trusted root certificates, used to verify HTTPS when fetching Supabase's JWKS.
 certifi
 
+# OpenAI SDK — calls the LLM (pointed at Gemini's OpenAI-compatible endpoint).
+openai
+
 # Testing
 pytest
 httpx          # FastAPI's TestClient uses this to make requests in tests

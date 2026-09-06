@@ -16,6 +16,7 @@ import {
   History,
   RotateCcw,
   ShieldCheck,
+  Wallet,
 } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { cn } from "../../lib/utils";
@@ -26,6 +27,7 @@ import {
   exportDailyReport,
   exportTimeOff,
   exportDriverContacts,
+  exportPayroll,
   logExport,
   fetchScheduledDeletions,
   cancelScheduledDeletion,
@@ -80,6 +82,15 @@ const SECTIONS: SectionDef[] = [
     icon: CalendarOff,
     accent: "bg-amber-50 text-amber-600",
     usesRange: true,
+  },
+  {
+    id: "payroll",
+    name: "Payroll",
+    description: "Weekly totals and daily pay detail — computed, so nothing is deleted.",
+    icon: Wallet,
+    accent: "bg-rose-50 text-rose-600",
+    usesRange: true,
+    retained: true,
   },
   {
     id: "driver_contacts",
@@ -169,6 +180,9 @@ export function SaveInformation() {
           break;
         case "time_off":
           rows = await exportTimeOff(startStr, endStr);
+          break;
+        case "payroll":
+          rows = await exportPayroll(startStr, endStr);
           break;
         case "driver_contacts":
           rows = await exportDriverContacts();

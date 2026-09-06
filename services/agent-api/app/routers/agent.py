@@ -1,5 +1,7 @@
 """POST /agent — ask the operations agent a question; it can call tools for real data."""
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
@@ -8,13 +10,18 @@ from ..auth import CurrentUser, get_current_user
 
 router = APIRouter(tags=["agent"])
 
+class AgentTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    text: str
+
 class AgentRequest(BaseModel):
     message: str
+    history: list[AgentTurn] = []
 
 class AgentResponse(BaseModel):
     reply: str
 
 @router.post("/agent", response_model=AgentResponse)
 def agent(body: AgentRequest, user: CurrentUser = Depends(get_current_user)):
-    reply = run_operations_agent(user, body.message)
+    reply = run_operations_agent(user, body.message, body.history)
     return AgentResponse(reply=reply)

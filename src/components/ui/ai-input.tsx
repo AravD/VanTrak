@@ -15,6 +15,9 @@ type ChatMessage = { role: "user" | "assistant"; text: string }
 
 // Smooth iOS-style easing for the morph.
 const EASE = [0.32, 0.72, 0, 1] as [number, number, number, number]
+const STORAGE_KEY = "vt_agent_chat"
+const HISTORY_TURNS = 10
+
 const DOCK_H = 44 // height of the "Ask VanTrak" dock — stays constant so it never moves
 
 export function MorphPanel() {
@@ -24,9 +27,34 @@ export function MorphPanel() {
   const scrollRef = React.useRef<HTMLDivElement>(null)
 
   const [open, setOpen] = React.useState(false)
-  const [messages, setMessages] = React.useState<ChatMessage[]>([])
+  const [messages, setMessages] = React.useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      return saved ? (JSON.parse(saved) as ChatMessage[]) : []
+    } catch {
+      return []
+    }
+  })
   const [loading, setLoading] = React.useState(false)
   const [value, setValue] = React.useState("")
+
+  // Persist the transcript so a page reload doesn't lose the conversation.
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-50)))
+    } catch {
+      // storage can be unavailable (private mode) — chat still works in memory
+    }
+  }, [messages])
+
+  const clearChat = React.useCallback(() => {
+    setMessages([])
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // nothing to clean up
+    }
+  }, [])
 
   const openPanel = React.useCallback(() => {
     setOpen(true)
@@ -54,7 +82,12 @@ export function MorphPanel() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          message: text,
+          history: messages
+            .slice(-HISTORY_TURNS)
+            .map((m) => ({ role: m.role, text: m.text })),
+        }),
       })
       const data = await res.json()
       const reply = res.ok
@@ -66,7 +99,7 @@ export function MorphPanel() {
     } finally {
       setLoading(false)
     }
-  }, [value, loading, session])
+  }, [value, loading, session, messages])
 
   // Keep the newest message in view.
   React.useEffect(() => {
@@ -112,19 +145,16 @@ export function MorphPanel() {
               >
                 {/* Header: icon + title on the left, Send on the top-right. */}
                 <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
-                  <div className="flex items-center gap-1.5 text-sm font-semibold text-black">
-                    <Sparkle className="h-4 w-4" />
-                    <span>Assistant</span>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-7 rounded-full px-3 text-xs"
-                    onClick={send}
-                    disabled={loading}
-                  >
-                    Send
-                  </Button>
+                  <span className="text-sm font-semibold text-black">Assistant</span>
+                  {messages.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearChat}
+                      className="rounded-lg px-2 py-1 text-xs text-gray-400 transition-colors duration-100 hover:bg-gray-100 hover:text-black"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
 
                 {/* Conversation. */}
@@ -149,22 +179,34 @@ export function MorphPanel() {
                 </div>
 
                 {/* Input. */}
-                <textarea
-                  ref={textareaRef}
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") closePanel()
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault()
-                      send()
-                    }
-                  }}
-                  placeholder="Ask me anything..."
-                  spellCheck={false}
-                  disabled={loading}
-                  className="h-14 w-full resize-none border-t border-gray-100 bg-white p-3 text-sm outline-0"
-                />
+                <div className="flex items-center gap-2 border-t border-gray-100 p-2">
+                  <textarea
+                    ref={textareaRef}
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") closePanel()
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        send()
+                      }
+                    }}
+                    placeholder="Ask me anything..."
+                    spellCheck={false}
+                    disabled={loading}
+                    rows={1}
+                    className="h-9 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm leading-6 outline-0"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-9 shrink-0 rounded-full px-4 text-xs transition-transform duration-150 ease-out active:scale-[0.97]"
+                    onClick={send}
+                    disabled={loading}
+                  >
+                    Send
+                  </Button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

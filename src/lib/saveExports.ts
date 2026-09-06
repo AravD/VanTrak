@@ -1,3 +1,4 @@
+import { addDays, format, startOfWeek } from 'date-fns';
 import { supabase } from './supabase';
 import { downloadWorkbook, tableSheet } from './export';
 import { exportMasterScheduleStyled } from './scheduleExport';
@@ -14,7 +15,11 @@ export type ExportSection =
   | 'master_schedule'
   | 'daily_report'
   | 'time_off'
-  | 'driver_contacts';
+  | 'driver_contacts'
+  | 'payroll';
+
+/** The agent API computes payroll; the browser must never duplicate that logic. */
+const PAYROLL_API = import.meta.env.VITE_AGENT_API_URL ?? 'http://localhost:8000';
 
 const trimTime = (t: string | null | undefined): string => (t ? t.slice(0, 5) : '');
 
@@ -198,6 +203,99 @@ export async function exportDriverContacts(): Promise<number> {
   ]);
 
   return rows.length;
+}
+
+// ── Payroll ──────────────────────────────────────────────────────────────────
+// Payroll is DERIVED, not stored: the FastAPI engine applies the overtime rules
+// (daily, weekly and 7th-consecutive-day) and we export what it returns. Weekly
+// totals always cover whole weeks, because overtime cannot be prorated across a
+// partial one — the daily sheet is what honours the exact range.
+
+/** Every week-start (Sunday) needed to cover the requested range. */
+function weekStartsCovering(start: string, end: string): string[] {
+  const lastDay = new Date(`${end}T00:00:00`);
+  const weeks: string[] = [];
+
+  for (
+    let cursor = startOfWeek(new Date(`${start}T00:00:00`));
+    cursor <= lastDay;
+    cursor = addDays(cursor, 7)
+  ) {
+    weeks.push(format(cursor, 'yyyy-MM-dd'));
+  }
+  return weeks;
+}
+
+export async function exportPayroll(start: string, end: string): Promise<number> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new Error('Sign in again to export payroll.');
+
+  const summaryRows: any[] = [];
+  const dailyRows: any[] = [];
+
+  for (const weekStart of weekStartsCovering(start, end)) {
+    const response = await fetch(`${PAYROLL_API}/payroll/week?start=${weekStart}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Payroll service returned ${response.status}. Is the agent API running?`,
+      );
+    }
+
+    const week = await response.json();
+
+    for (const driver of week.drivers ?? []) {
+      summaryRows.push({ ...driver, week_start: week.week_start, week_end: week.week_end });
+
+      for (const day of driver.days ?? []) {
+        if (day.date < start || day.date > end) continue;
+        dailyRows.push({ ...day, name: driver.name });
+      }
+    }
+  }
+
+  downloadWorkbook(`Payroll ${start} to ${end}`, [
+    tableSheet(
+      'Weekly Summary',
+      [
+        { header: 'Week Start', value: (r: any) => r.week_start, width: 14 },
+        { header: 'Week End', value: (r: any) => r.week_end, width: 14 },
+        { header: 'Driver', value: (r: any) => r.name, width: 22 },
+        { header: 'Rate', value: (r: any) => Number(r.hourly_rate), width: 10 },
+        { header: 'Regular Hrs', value: (r: any) => Number(r.regular_hours), width: 12 },
+        { header: 'Overtime Hrs', value: (r: any) => Number(r.overtime_hours), width: 13 },
+        { header: 'Double Time Hrs', value: (r: any) => Number(r.doubletime_hours), width: 16 },
+        { header: 'Regular Pay', value: (r: any) => Number(r.regular_pay), width: 13 },
+        { header: 'Overtime Pay', value: (r: any) => Number(r.overtime_pay), width: 13 },
+        { header: 'Double Time Pay', value: (r: any) => Number(r.doubletime_pay), width: 16 },
+        { header: 'Total Pay', value: (r: any) => Number(r.total_pay), width: 13 },
+      ],
+      summaryRows,
+    ),
+    tableSheet(
+      'Daily Detail',
+      [
+        { header: 'Date', value: (r: any) => r.date, width: 14 },
+        { header: 'Driver', value: (r: any) => r.name, width: 22 },
+        { header: 'Hours Worked', value: (r: any) => Number(r.hours), width: 13 },
+        { header: 'Regular Hrs', value: (r: any) => Number(r.regular_hours), width: 12 },
+        { header: 'Overtime Hrs', value: (r: any) => Number(r.overtime_hours), width: 13 },
+        { header: 'Double Time Hrs', value: (r: any) => Number(r.doubletime_hours), width: 16 },
+        { header: 'Rate', value: (r: any) => Number(r.hourly_rate), width: 10 },
+        { header: 'Regular Pay', value: (r: any) => Number(r.regular_pay), width: 13 },
+        { header: 'Overtime Pay', value: (r: any) => Number(r.overtime_pay), width: 13 },
+        { header: 'Double Time Pay', value: (r: any) => Number(r.doubletime_pay), width: 16 },
+        { header: 'Total Pay', value: (r: any) => Number(r.total_pay), width: 13 },
+      ],
+      dailyRows,
+    ),
+  ]);
+
+  return summaryRows.length + dailyRows.length;
 }
 
 /**

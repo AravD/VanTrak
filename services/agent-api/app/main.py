@@ -15,7 +15,12 @@ app = FastAPI(title="VanTrak Agent API")
 # Which browser origins may call this API (the web dev servers).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://vantrak.app",
+        "https://www.vantrak.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

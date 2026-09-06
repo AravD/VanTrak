@@ -5,6 +5,7 @@ import {
   Users,
   CalendarOff,
   ClipboardList,
+  Wallet,
   Download,
   UserCog,
   LogOut,
@@ -15,7 +16,7 @@ import { cn } from "../../lib/utils";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../app/auth-context";
 
-type Page = "home" | "schedule" | "contacts" | "timeoff" | "dailyreport" | "saveinfo" | "team" | "account";
+type Page = "home" | "schedule" | "contacts" | "timeoff" | "dailyreport" | "payroll" | "saveinfo" | "team" | "account";
 
 /** The two widths the sidebar toggles between when the edge arrow is clicked. */
 export type SidebarState = "compact" | "icon";
@@ -71,6 +72,8 @@ export function Sidebar({
     hasPermission("admin.invite") ||
     hasPermission("admin.permissions.edit") ||
     hasPermission("admin.users.remove");
+  const canPayroll =
+    hasPermission("payroll.view") || hasPermission("payroll.manage");
 
   const iconOnly = state === "icon";
 
@@ -86,6 +89,9 @@ export function Sidebar({
         { page: "dailyreport" as Page, label: "Daily Report", full: "Daily Report", icon: ClipboardList },
         { page: "timeoff" as Page, label: "Time Off", full: "Time Off & Exceptions", icon: CalendarOff },
         { page: "contacts" as Page, label: "Drivers", full: "Driver Contacts", icon: Users },
+        ...(canPayroll
+          ? [{ page: "payroll" as Page, label: "Payroll", full: "Payroll", icon: Wallet }]
+          : []),
       ],
     },
     {

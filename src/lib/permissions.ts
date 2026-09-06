@@ -58,6 +58,13 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     ],
   },
   {
+    title: 'Payroll',
+    permissions: [
+      { key: 'payroll.view', label: 'View Payroll' },
+      { key: 'payroll.manage', label: 'Manage Wages' },
+    ],
+  },
+  {
     title: 'Administration',
     permissions: [
       { key: 'admin.invite', label: 'Invite Team Members' },
@@ -95,6 +102,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'drivers.view', 'drivers.add', 'drivers.edit', 'drivers.change_status',
       'reports.view', 'reports.rollcall.edit', 'reports.operations.edit', 'reports.issues.log',
       'stations.view',
+      'payroll.view',
     ],
   },
   {

@@ -8,7 +8,7 @@ As we add features, endpoint groups get registered here:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import agent, chat, drivers, health, me
+from .routers import agent, chat, drivers, health, me, payroll
 
 app = FastAPI(title="VanTrak Agent API")
 
@@ -26,3 +26,4 @@ app.include_router(me.router)
 app.include_router(drivers.router)
 app.include_router(chat.router)
 app.include_router(agent.router)
+app.include_router(payroll.router)

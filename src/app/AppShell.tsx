@@ -10,6 +10,7 @@ import { MasterSchedule } from "../components/schedule/MasterSchedule";
 import { DriverContacts } from "../components/drivers/DriverContacts";
 import { TimeOffExceptions } from "../components/timeoff/TimeOffExceptions";
 import { DailyReport } from "../components/dailyreport/DailyReport";
+import { Payroll } from "../components/payroll/Payroll";
 import { SaveInformation } from "../components/saveinfo/SaveInformation";
 import { TeamManagement } from "../components/team/TeamManagement";
 import { MyAccount } from "../components/account/MyAccount";
@@ -24,12 +25,15 @@ type Page =
   | "contacts"
   | "timeoff"
   | "dailyreport"
+  | "payroll"
   | "saveinfo"
   | "team"
   | "account";
 
 export function AppShell() {
   const { signOut, hasPermission } = useAuth();
+  const canPayroll =
+    hasPermission("payroll.view") || hasPermission("payroll.manage");
 
   const [activePage, setActivePage] = useState<Page>(() => {
     const lastPage = (localStorage.getItem("activePage") as Page) || "home";
@@ -42,13 +46,16 @@ export function AppShell() {
     return landing === "last" ? lastPage : (landing as Page);
   });
 
+  const [dailyReportDate, setDailyReportDate] = useState<string | undefined>();
+
   const [sidebarState, setSidebarState] = useState<SidebarState>(() => {
     const saved = localStorage.getItem("sidebarState");
     return saved === "icon" || saved === "compact" ? saved : "compact";
   });
 
-  const handlePageChange = (page: Page) => {
+  const handlePageChange = (page: Page, options?: { date?: string }) => {
     localStorage.setItem("activePage", page);
+    setDailyReportDate(options?.date);
     setActivePage(page);
   };
 
@@ -99,7 +106,20 @@ export function AppShell() {
             ) : activePage === "timeoff" ? (
               <TimeOffExceptions />
             ) : activePage === "dailyreport" ? (
-              <DailyReport />
+              <DailyReport initialDate={dailyReportDate} />
+            ) : activePage === "payroll" ? (
+              canPayroll ? (
+                <Payroll onNavigate={handlePageChange} />
+              ) : (
+                <div className="mx-auto mt-24 max-w-sm px-8 text-center">
+                  <h2 className="text-base font-semibold text-black">
+                    You don't have access
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Viewing payroll requires the Payroll permission.
+                  </p>
+                </div>
+              )
             ) : activePage === "team" ? (
               <TeamManagement />
             ) : activePage === "account" ? (

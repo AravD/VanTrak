@@ -85,13 +85,12 @@ export function MorphPanel() {
   }, [open, closePanel])
 
   return (
-    // The box itself is the fixed, bottom-pinned element. Growing its height keeps
-    // the bottom edge pixel-locked, so the dock ("Ask VanTrak") never moves.
-    // We only animate width/height/borderRadius, so motion leaves the
-    // `-translate-x-1/2` centering transform untouched.
+    // The box itself is the fixed, bottom-right-pinned element. Growing its
+    // height keeps the bottom edge pixel-locked and growing its width extends
+    // leftward, so the dock ("Ask VanTrak") never moves.
     <motion.div
       ref={wrapperRef}
-      className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 flex-col overflow-hidden border border-gray-200 bg-white shadow-lg"
+      className="fixed right-4 bottom-4 z-50 flex flex-col overflow-hidden border border-gray-200 bg-white shadow-lg"
       initial={false}
       animate={{
         width: open ? 340 : 150,

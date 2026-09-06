@@ -5,6 +5,7 @@ import {
   Users,
   Truck,
   AlertTriangle,
+  Info,
   Gauge,
   Mail,
   Trash2,
@@ -303,6 +304,21 @@ export function HomeDashboard({ onNavigate }: HomeDashboardProps) {
           {data ? ` · ${data.scheduled} scheduled · ${data.routesDone}/${data.rollTotal} routes done · ${data.issuesToday} issue${data.issuesToday === 1 ? "" : "s"} today` : ""}
         </p>
       </header>
+
+      {isGuest && (
+        <div className="mb-8 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div className="text-sm leading-relaxed">
+            <p className="font-semibold text-amber-900">You're browsing as a guest</p>
+            <p className="mt-0.5 text-amber-800">
+              Some features need a full account — including the{" "}
+              <span className="font-medium">AI agent assistant</span> and{" "}
+              <span className="font-medium">payroll setup</span>. Sign up to unlock
+              them and keep your data saved.
+            </p>
+          </div>
+        </div>
+      )}
 
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">

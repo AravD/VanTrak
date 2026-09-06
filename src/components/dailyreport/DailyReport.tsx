@@ -23,9 +23,11 @@ interface Station {
 const trimTime = (t: string | null | undefined): string =>
   t ? t.slice(0, 5) : '';
 
-export function DailyReport() {
+export function DailyReport({ initialDate }: { initialDate?: string }) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('Roll Call');
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedDate, setSelectedDate] = useState(
+    initialDate ?? format(new Date(), 'yyyy-MM-dd'),
+  );
   const [stations, setStations] = useState<Station[]>([]);
   const [activeStationId, setActiveStationId] = useState<string>('');
 

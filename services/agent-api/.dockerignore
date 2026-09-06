@@ -1,0 +1,9 @@
+# Secrets are supplied as Lambda environment variables, never baked into the image.
+.env
+.env.*
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/

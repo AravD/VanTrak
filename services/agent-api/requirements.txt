@@ -18,6 +18,9 @@ certifi
 # OpenAI SDK — calls the LLM (pointed at Gemini's OpenAI-compatible endpoint).
 openai
 
+# Adapter that lets Lambda invoke the ASGI (FastAPI) app.
+mangum
+
 # Testing
 pytest
 httpx          # FastAPI's TestClient uses this to make requests in tests
